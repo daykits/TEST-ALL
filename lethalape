@@ -1,0 +1,223 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Tọa độ mục tiêu từ hình ảnh
+local targetPosition = Vector3.new(-184.15, 1035.19, -68.42)
+
+-- Xóa Menu cũ nếu đã tồn tại
+local oldGui = CoreGui:FindFirstChild("TeleportMenu")
+if oldGui then oldGui:Destroy() end
+
+-- ==========================================
+-- 1. TẠO GIAO DIỆN MENU NHỎ GỌN
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TeleportMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = CoreGui
+
+-- Khung chính của Menu
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 180, 0, 150)
+MainFrame.Position = UDim2.new(0, 20, 0, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 255, 120)
+UIStroke.Thickness = 1.5
+UIStroke.Parent = MainFrame
+
+-- Thanh tiêu đề (Để kéo thả)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -10, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "Mini Teleporter"
+TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 12
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+-- Hiệu ứng kéo thả
+local dragging, dragInput, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ==========================================
+-- 2. CHỨC NĂNG TẠO NÚT (Toggle & Button)
+-- ==========================================
+local function CreateButton(text, posY, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 28)
+    btn.Position = UDim2.new(0.05, 0, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
+    btn.AutoButtonColor = false
+    btn.Parent = MainFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        -- Hiệu ứng click
+        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+        task.wait(0.1)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        callback()
+    end)
+    return btn
+end
+
+-- ==========================================
+-- 3. LOGIC CHỨC NĂNG
+-- ==========================================
+local isNoclip = false
+local noclipConn = nil
+local isFloating = false
+
+local function GetCharacterParts()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil, nil end
+    return char, char:FindFirstChildOfClass("Humanoid"), char:FindFirstChild("HumanoidRootPart")
+end
+
+-- Chức năng Noclip
+local function ToggleNoclip()
+    isNoclip = not isNoclip
+    
+    if isNoclip then
+        if not noclipConn then
+            noclipConn = RunService.Stepped:Connect(function()
+                local char = GetCharacterParts()
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        if noclipConn then
+            noclipConn:Disconnect()
+            noclipConn = nil
+            local char = GetCharacterParts()
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Chức năng Lơ lửng (Float)
+local function SetFloat(state)
+    local _, _, hrp = GetCharacterParts()
+    if not hrp then return end
+    
+    isFloating = state
+    if state then
+        if not hrp:FindFirstChild("HoverBodyPosition") then
+            local bp = Instance.new("BodyPosition")
+            bp.Name = "HoverBodyPosition"
+            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bp.Position = hrp.Position
+            bp.Parent = hrp
+        end
+    else
+        local bp = hrp:FindFirstChild("HoverBodyPosition")
+        if bp then bp:Destroy() end
+    end
+end
+
+-- Chức năng Dịch chuyển
+local function TeleportToCoords()
+    local _, _, hrp = GetCharacterParts()
+    if not hrp then return end
+    
+    -- Dịch chuyển
+    hrp.CFrame = CFrame.new(targetPosition)
+    
+    -- Nếu đang bật float thì cập nhật vị trí float
+    if isFloating then
+        SetFloat(false)
+        task.wait(0.1)
+        SetFloat(true)
+    end
+end
+
+-- ==========================================
+-- 4. KHỞI TẠO NÚT BẤM
+-- ==========================================
+CreateButton("1. Teleport Đến Tọa Độ", 35, function()
+    TeleportToCoords()
+end)
+
+local btnNoclip = CreateButton("Noclip: OFF", 70, function()
+    ToggleNoclip()
+    btnNoclip.Text = "Noclip: " .. (isNoclip and "ON" or "OFF")
+    btnNoclip.TextColor3 = isNoclip and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
+end)
+
+local btnFloat = CreateButton("Float (Lơ Lửng): OFF", 105, function()
+    SetFloat(not isFloating)
+    btnFloat.Text = "Float (Lơ Lửng): " .. (isFloating and "ON" or "OFF")
+    btnFloat.TextColor3 = isFloating and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
+end)
+
+-- Tự động dọn dẹp khi nhân vật chết để tránh lỗi
+LocalPlayer.CharacterAdded:Connect(function()
+    isFloating = false
+    btnFloat.Text = "Float (Lơ Lửng): OFF"
+    btnFloat.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
