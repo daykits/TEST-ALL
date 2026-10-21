@@ -1,12 +1,14 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
 
--- Tọa độ mục tiêu từ hình ảnh
-local targetPosition = Vector3.new(-184.15, 1035.19, -68.42)
+-- Tọa độ mục tiêu trên trời
+local skyPosition = Vector3.new(-184.15, 1035.19, -68.42)
 
 -- Xóa Menu cũ nếu đã tồn tại
 local oldGui = CoreGui:FindFirstChild("TeleportMenu")
@@ -21,9 +23,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
--- Khung chính của Menu
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 180, 0, 150)
+MainFrame.Size = UDim2.new(0, 210, 0, 180) -- Tăng chiều cao để chứa thêm nút
 MainFrame.Position = UDim2.new(0, 20, 0, 20)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
@@ -39,7 +40,6 @@ UIStroke.Color = Color3.fromRGB(0, 255, 120)
 UIStroke.Thickness = 1.5
 UIStroke.Parent = MainFrame
 
--- Thanh tiêu đề (Để kéo thả)
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
@@ -54,14 +54,14 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(1, -10, 1, 0)
 TitleText.Position = UDim2.new(0, 10, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Mini Teleporter"
+TitleText.Text = "Auto Team & ESP Hub"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 12
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = TitleBar
 
--- Hiệu ứng kéo thả
+-- Kéo thả
 local dragging, dragInput, dragStart, startPos
 TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -85,12 +85,10 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ==========================================
--- 2. CHỨC NĂNG TẠO NÚT (Toggle & Button)
--- ==========================================
+-- Hàm tạo nút
 local function CreateButton(text, posY, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 28)
+    btn.Size = UDim2.new(0.9, 0, 0, 25)
     btn.Position = UDim2.new(0.05, 0, 0, posY)
     btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
     btn.Text = text
@@ -105,7 +103,6 @@ local function CreateButton(text, posY, callback)
     corner.Parent = btn
     
     btn.MouseButton1Click:Connect(function()
-        -- Hiệu ứng click
         btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
         task.wait(0.1)
         btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
@@ -115,11 +112,14 @@ local function CreateButton(text, posY, callback)
 end
 
 -- ==========================================
--- 3. LOGIC CHỨC NĂNG
+-- 2. BIẾN TOÀN CỤC & CHỨC NĂNG CƠ BẢN
 -- ==========================================
 local isNoclip = false
 local noclipConn = nil
 local isFloating = false
+local activeTween = nil
+local autoTeamEnabled = false
+local espEnabled = false
 
 local function GetCharacterParts()
     local char = LocalPlayer.Character
@@ -127,19 +127,16 @@ local function GetCharacterParts()
     return char, char:FindFirstChildOfClass("Humanoid"), char:FindFirstChild("HumanoidRootPart")
 end
 
--- Chức năng Noclip
+-- Noclip
 local function ToggleNoclip()
     isNoclip = not isNoclip
-    
     if isNoclip then
         if not noclipConn then
             noclipConn = RunService.Stepped:Connect(function()
                 local char = GetCharacterParts()
                 if char then
                     for _, part in ipairs(char:GetDescendants()) do
-                        if part:IsA("BasePart") and part.CanCollide then
-                            part.CanCollide = false
-                        end
+                        if part:IsA("BasePart") then part.CanCollide = false end
                     end
                 end
             end)
@@ -151,16 +148,14 @@ local function ToggleNoclip()
             local char = GetCharacterParts()
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
+                    if part:IsA("BasePart") then part.CanCollide = true end
                 end
             end
         end
     end
 end
 
--- Chức năng Lơ lửng (Float)
+-- Float
 local function SetFloat(state)
     local _, _, hrp = GetCharacterParts()
     if not hrp then return end
@@ -180,44 +175,207 @@ local function SetFloat(state)
     end
 end
 
--- Chức năng Dịch chuyển
-local function TeleportToCoords()
+-- Tween đến tọa độ
+local function TweenToPosition(targetPos, duration)
     local _, _, hrp = GetCharacterParts()
     if not hrp then return end
     
-    -- Dịch chuyển
-    hrp.CFrame = CFrame.new(targetPosition)
+    if activeTween then activeTween:Cancel() end
+    if isFloating then SetFloat(false) end
+
+    local targetCFrame = CFrame.new(targetPos)
+    local tweenInfo = TweenInfo.new(duration or 3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
-    -- Nếu đang bật float thì cập nhật vị trí float
-    if isFloating then
-        SetFloat(false)
-        task.wait(0.1)
-        SetFloat(true)
+    activeTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+    activeTween:Play()
+    
+    activeTween.Completed:Connect(function()
+        if isFloating and autoTeamEnabled then
+            SetFloat(true) -- Nếu ở trên trời thì bật lại float
+        end
+        activeTween = nil
+    end)
+end
+
+-- ==========================================
+-- 3. CHỨC NĂNG ESP TEAM
+-- ==========================================
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "TeamESP"
+ESPFolder.Parent = CoreGui
+
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    
+    local espBox = Instance.new("BoxHandleAdornment")
+    espBox.Name = player.Name .. "_ESP"
+    espBox.Adornee = nil
+    espBox.AlwaysOnTop = true
+    espBox.ZIndex = 10
+    espBox.Size = Vector3.new(4, 5, 1)
+    espBox.Transparency = 0.5
+    espBox.Color3 = Color3.fromRGB(0, 255, 0) -- Màu xanh lá
+    espBox.Parent = ESPFolder
+
+    local espName = Instance.new("BillboardGui")
+    espName.Name = player.Name .. "_NameESP"
+    espName.AlwaysOnTop = true
+    espName.Size = UDim2.new(0, 200, 0, 50)
+    espName.StudsOffset = Vector3.new(0, 3, 0)
+    espName.Adornee = nil
+    espName.Parent = ESPFolder
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 14
+    textLabel.Text = player.Name
+    textLabel.Parent = espName
+
+    task.spawn(function()
+        while espEnabled and player.Parent do
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if hrp then
+                espBox.Adornee = hrp
+                espName.Adornee = hrp
+                
+                local distance = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position - hrp.Position).Magnitude or 0)
+                textLabel.Text = string.format("%s [%dm]", player.Name, distance)
+                
+                -- Đổi màu địch (Đỏ) - đồng minh (Xanh)
+                local isEnemy = (LocalPlayer.Team ~= nil and player.Team ~= nil and LocalPlayer.Team ~= player.Team)
+                local color = isEnemy and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 0)
+                espBox.Color3 = color
+                textLabel.TextColor3 = color
+            else
+                espBox.Adornee = nil
+                espName.Adornee = nil
+            end
+            task.wait(0.5)
+        end
+        espBox:Destroy()
+        espName:Destroy()
+    end)
+end
+
+local function ToggleESP(state)
+    espEnabled = state
+    if state then
+        for _, player in ipairs(Players:GetPlayers()) do CreateESP(player) end
+        Players.PlayerAdded:Connect(function(p) if espEnabled then CreateESP(p) end end)
+    else
+        for _, obj in ipairs(ESPFolder:GetChildren()) do obj:Destroy() end
     end
 end
 
 -- ==========================================
--- 4. KHỞI TẠO NÚT BẤM
+-- 4. LOGIC AUTO TEAM
 -- ==========================================
-CreateButton("1. Teleport Đến Tọa Độ", 35, function()
-    TeleportToCoords()
+local lastTeam = nil
+local lastAutoTween = 0
+
+RunService.Heartbeat:Connect(function()
+    if not autoTeamEnabled then return end
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then return end
+    
+    local currentTeam = LocalPlayer.Team
+    
+    -- 1. NẾU LÀ TEAM TRỐNG (NEUTRAL)
+    if not currentTeam then
+        if lastTeam ~= nil or lastTeam == nil then -- Check lần đầu
+            lastTeam = nil
+            if (hrp.Position - skyPosition).Magnitude > 50 then
+                -- Bay lên trời và lơ lửng
+                TweenToPosition(skyPosition, 5)
+                SetFloat(true)
+                lastTeam = "Neutral"
+            end
+        end
+    else
+        -- 2. NẾU CÓ TEAM (ĐI TÌM ĐỊCH)
+        if lastTeam ~= currentTeam then
+            lastTeam = currentTeam
+            SetFloat(false) -- Tắt lơ lửng vì phải combat
+        end
+        
+        -- Tự động tìm người chơi team địch gần nhất
+        local closestEnemy = nil
+        local shortestDist = math.huge
+        
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Team and plr.Team ~= LocalPlayer.Team then
+                local eChar = plr.Character
+                local eHrp = eChar and eChar:FindFirstChild("HumanoidRootPart")
+                local eHum = eChar and eChar:FindFirstChildOfClass("Humanoid")
+                
+                if eHrp and eHum and eHum.Health > 0 then
+                    local dist = (hrp.Position - eHrp.Position).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closestEnemy = eHrp
+                    end
+                end
+            end
+        end
+        
+        -- Nếu tìm thấy địch và cách xa hơn 15 studs -> Bay tới
+        if closestEnemy and shortestDist > 15 and tick() - lastAutoTween > 3 then
+            lastAutoTween = tick()
+            TweenToPosition(closestEnemy.Position + Vector3.new(0, 5, 0), 2) -- Bay tới vị trí địch (nhích lên 5 studs)
+        end
+    end
 end)
 
-local btnNoclip = CreateButton("Noclip: OFF", 70, function()
+-- ==========================================
+-- 5. KHỞI TẠO NÚT BẤM
+-- ==========================================
+CreateButton("Bay Lên Trời & Lơ Lửng", 35, function()
+    TweenToPosition(skyPosition, 3)
+    task.wait(3)
+    SetFloat(true)
+end)
+
+local btnNoclip = CreateButton("Noclip: OFF", 65, function()
     ToggleNoclip()
     btnNoclip.Text = "Noclip: " .. (isNoclip and "ON" or "OFF")
     btnNoclip.TextColor3 = isNoclip and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
 end)
 
-local btnFloat = CreateButton("Float (Lơ Lửng): OFF", 105, function()
+local btnFloat = CreateButton("Float: OFF", 95, function()
     SetFloat(not isFloating)
-    btnFloat.Text = "Float (Lơ Lửng): " .. (isFloating and "ON" or "OFF")
+    btnFloat.Text = "Float: " .. (isFloating and "ON" or "OFF")
     btnFloat.TextColor3 = isFloating and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
 end)
 
--- Tự động dọn dẹp khi nhân vật chết để tránh lỗi
+local btnESP = CreateButton("ESP Team: OFF", 125, function()
+    ToggleESP(not espEnabled)
+    btnESP.Text = "ESP Team: " .. (espEnabled and "ON" or "OFF")
+    btnESP.TextColor3 = espEnabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
+end)
+
+local btnAutoTeam = CreateButton("Auto Team: OFF", 155, function()
+    autoTeamEnabled = not autoTeamEnabled
+    btnAutoTeam.Text = "Auto Team: " .. (autoTeamEnabled and "ON" or "OFF")
+    btnAutoTeam.TextColor3 = autoTeamEnabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
+    
+    if not autoTeamEnabled then
+        SetFloat(false) -- Tắt auto team thì tắt float
+    end
+end)
+
+-- Reset khi chết
 LocalPlayer.CharacterAdded:Connect(function()
     isFloating = false
-    btnFloat.Text = "Float (Lơ Lửng): OFF"
+    if activeTween then activeTween:Cancel() end
+    btnFloat.Text = "Float: OFF"
     btnFloat.TextColor3 = Color3.fromRGB(255, 255, 255)
 end)
