@@ -24,7 +24,7 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 210, 0, 215) -- Tăng chiều cao để chứa thêm nút Speed
+MainFrame.Size = UDim2.new(0, 210, 0, 215) -- Chiều cao chứa 6 nút
 MainFrame.Position = UDim2.new(0, 20, 0, 20)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
@@ -108,15 +108,15 @@ local isMinimized = false
 MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
-        MainFrame.Size = UDim2.new(0, 210, 0, 30) -- Chỉ giữ lại thanh tiêu đề
+        MainFrame.Size = UDim2.new(0, 210, 0, 30)
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 210, 0, 215) -- Mở rộng lại
+        MainFrame.Size = UDim2.new(0, 210, 0, 215)
         MinimizeBtn.Text = "-"
     end
 end)
 
--- Hàm tạo nút
+-- Hàm tạo nút (Đã fix lỗi block luồng)
 local function CreateButton(text, posY, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 25)
@@ -134,9 +134,14 @@ local function CreateButton(text, posY, callback)
     corner.Parent = btn
     
     btn.MouseButton1Click:Connect(function()
-        btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
-        task.wait(0.1)
-        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        -- Dùng task.spawn cho hiệu ứng click để không block logic chính
+        task.spawn(function()
+            btn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+            task.wait(0.1)
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        end)
+        
+        -- Gọi logic ngay lập tức
         callback()
     end)
     return btn
@@ -152,7 +157,7 @@ local activeTween = nil
 local autoTeamEnabled = false
 local espEnabled = false
 local speedEnabled = false
-local targetSpeed = 60 -- Tốc độ chạy mục tiêu
+local targetSpeed = 60
 
 local function GetCharacterParts()
     local char = LocalPlayer.Character
@@ -208,7 +213,7 @@ local function SetFloat(state)
     end
 end
 
--- Tween đến tọa độ
+-- Tween
 local function TweenToPosition(targetPos, duration)
     local _, _, hrp = GetCharacterParts()
     if not hrp then return end
@@ -230,7 +235,7 @@ local function TweenToPosition(targetPos, duration)
     end)
 end
 
--- Teleport tức thời
+-- Teleport
 local function InstantTeleport(targetPos)
     local _, _, hrp = GetCharacterParts()
     if not hrp then return end
@@ -242,9 +247,10 @@ local function InstantTeleport(targetPos)
 end
 
 -- ==========================================
--- 3. LOGIC TỐC ĐỘ CHẠY (HEARTBEAT DUY TRÌ)
+-- 3. LOGIC TỐC ĐỘ CHẠY (FIX LỖI SERVER RESET)
 -- ==========================================
-RunService.Heartbeat:Connect(function()
+-- Dùng Stepped (chạy trước khi render) để đè WalkSpeed liên tục chống server reset
+RunService.Stepped:Connect(function()
     if speedEnabled then
         local _, hum, _ = GetCharacterParts()
         if hum and hum.WalkSpeed ~= targetSpeed then
@@ -344,7 +350,6 @@ RunService.Heartbeat:Connect(function()
     
     local currentTeam = LocalPlayer.Team
     
-    -- 1. TEAM TRỐNG
     if not currentTeam then
         if lastTeam ~= "Neutral" then
             lastTeam = "Neutral"
@@ -354,7 +359,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
     else
-        -- 2. ĐI TÌM ĐỊCH
         if lastTeam ~= currentTeam then
             lastTeam = currentTeam
             SetFloat(false)
@@ -423,7 +427,6 @@ local btnAutoTeam = CreateButton("Auto Team: OFF", 155, function()
     end
 end)
 
--- Nút Tốc độ chạy
 local btnSpeed = CreateButton("Speed 60: OFF", 185, function()
     speedEnabled = not speedEnabled
     btnSpeed.Text = "Speed 60: " .. (speedEnabled and "ON" or "OFF")
@@ -442,5 +445,4 @@ LocalPlayer.CharacterAdded:Connect(function()
     if activeTween then activeTween:Cancel() end
     btnFloat.Text = "Float: OFF"
     btnFloat.TextColor3 = Color3.fromRGB(255, 255, 255)
-    -- Nếu đang bật Speed thì giữ nguyên trạng thái nút, Heartbeat sẽ tự set lại sau khi hồi sinh
 end)
