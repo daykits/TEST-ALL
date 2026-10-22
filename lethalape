@@ -24,11 +24,12 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 210, 0, 180) -- Tăng chiều cao để chứa thêm nút
+MainFrame.Size = UDim2.new(0, 210, 0, 215) -- Tăng chiều cao để chứa thêm nút Speed
 MainFrame.Position = UDim2.new(0, 20, 0, 20)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
+MainFrame.ClipsDescendants = true 
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
@@ -40,6 +41,7 @@ UIStroke.Color = Color3.fromRGB(0, 255, 120)
 UIStroke.Thickness = 1.5
 UIStroke.Parent = MainFrame
 
+-- Thanh tiêu đề
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
@@ -51,7 +53,7 @@ TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = TitleBar
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -10, 1, 0)
+TitleText.Size = UDim2.new(1, -35, 1, 0)
 TitleText.Position = UDim2.new(0, 10, 0, 0)
 TitleText.BackgroundTransparency = 1
 TitleText.Text = "Auto Team & ESP Hub"
@@ -60,6 +62,22 @@ TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 12
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Parent = TitleBar
+
+-- Nút Thu nhỏ / Mở rộng
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+MinimizeBtn.Position = UDim2.new(1, -28, 0, 2)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 16
+MinimizeBtn.AutoButtonColor = false
+MinimizeBtn.Parent = TitleBar
+
+local MinBtnCorner = Instance.new("UICorner")
+MinBtnCorner.CornerRadius = UDim.new(0, 6)
+MinBtnCorner.Parent = MinimizeBtn
 
 -- Kéo thả
 local dragging, dragInput, dragStart, startPos
@@ -82,6 +100,19 @@ UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Logic Thu nhỏ / Mở rộng
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        MainFrame.Size = UDim2.new(0, 210, 0, 30) -- Chỉ giữ lại thanh tiêu đề
+        MinimizeBtn.Text = "+"
+    else
+        MainFrame.Size = UDim2.new(0, 210, 0, 215) -- Mở rộng lại
+        MinimizeBtn.Text = "-"
     end
 end)
 
@@ -120,6 +151,8 @@ local isFloating = false
 local activeTween = nil
 local autoTeamEnabled = false
 local espEnabled = false
+local speedEnabled = false
+local targetSpeed = 60 -- Tốc độ chạy mục tiêu
 
 local function GetCharacterParts()
     local char = LocalPlayer.Character
@@ -191,14 +224,37 @@ local function TweenToPosition(targetPos, duration)
     
     activeTween.Completed:Connect(function()
         if isFloating and autoTeamEnabled then
-            SetFloat(true) -- Nếu ở trên trời thì bật lại float
+            SetFloat(true)
         end
         activeTween = nil
     end)
 end
 
+-- Teleport tức thời
+local function InstantTeleport(targetPos)
+    local _, _, hrp = GetCharacterParts()
+    if not hrp then return end
+    
+    if activeTween then activeTween:Cancel() end
+    SetFloat(false)
+    
+    hrp.CFrame = CFrame.new(targetPos)
+end
+
 -- ==========================================
--- 3. CHỨC NĂNG ESP TEAM
+-- 3. LOGIC TỐC ĐỘ CHẠY (HEARTBEAT DUY TRÌ)
+-- ==========================================
+RunService.Heartbeat:Connect(function()
+    if speedEnabled then
+        local _, hum, _ = GetCharacterParts()
+        if hum and hum.WalkSpeed ~= targetSpeed then
+            hum.WalkSpeed = targetSpeed
+        end
+    end
+end)
+
+-- ==========================================
+-- 4. CHỨC NĂNG ESP TEAM
 -- ==========================================
 local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "TeamESP"
@@ -214,7 +270,7 @@ local function CreateESP(player)
     espBox.ZIndex = 10
     espBox.Size = Vector3.new(4, 5, 1)
     espBox.Transparency = 0.5
-    espBox.Color3 = Color3.fromRGB(0, 255, 0) -- Màu xanh lá
+    espBox.Color3 = Color3.fromRGB(0, 255, 0)
     espBox.Parent = ESPFolder
 
     local espName = Instance.new("BillboardGui")
@@ -247,9 +303,8 @@ local function CreateESP(player)
                 local distance = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position - hrp.Position).Magnitude or 0)
                 textLabel.Text = string.format("%s [%dm]", player.Name, distance)
                 
-                -- Đổi màu địch (Đỏ) - đồng minh (Xanh)
                 local isEnemy = (LocalPlayer.Team ~= nil and player.Team ~= nil and LocalPlayer.Team ~= player.Team)
-                local color = isEnemy and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 0)
+                local color = isEnemy and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 120)
                 espBox.Color3 = color
                 textLabel.TextColor3 = color
             else
@@ -274,7 +329,7 @@ local function ToggleESP(state)
 end
 
 -- ==========================================
--- 4. LOGIC AUTO TEAM
+-- 5. LOGIC AUTO TEAM
 -- ==========================================
 local lastTeam = nil
 local lastAutoTween = 0
@@ -289,25 +344,22 @@ RunService.Heartbeat:Connect(function()
     
     local currentTeam = LocalPlayer.Team
     
-    -- 1. NẾU LÀ TEAM TRỐNG (NEUTRAL)
+    -- 1. TEAM TRỐNG
     if not currentTeam then
-        if lastTeam ~= nil or lastTeam == nil then -- Check lần đầu
-            lastTeam = nil
+        if lastTeam ~= "Neutral" then
+            lastTeam = "Neutral"
             if (hrp.Position - skyPosition).Magnitude > 50 then
-                -- Bay lên trời và lơ lửng
                 TweenToPosition(skyPosition, 5)
                 SetFloat(true)
-                lastTeam = "Neutral"
             end
         end
     else
-        -- 2. NẾU CÓ TEAM (ĐI TÌM ĐỊCH)
+        -- 2. ĐI TÌM ĐỊCH
         if lastTeam ~= currentTeam then
             lastTeam = currentTeam
-            SetFloat(false) -- Tắt lơ lửng vì phải combat
+            SetFloat(false)
         end
         
-        -- Tự động tìm người chơi team địch gần nhất
         local closestEnemy = nil
         local shortestDist = math.huge
         
@@ -327,16 +379,15 @@ RunService.Heartbeat:Connect(function()
             end
         end
         
-        -- Nếu tìm thấy địch và cách xa hơn 15 studs -> Bay tới
-        if closestEnemy and shortestDist > 15 and tick() - lastAutoTween > 3 then
+        if closestEnemy and shortestDist > 15 and tick() - lastAutoTween > 1 then
             lastAutoTween = tick()
-            TweenToPosition(closestEnemy.Position + Vector3.new(0, 5, 0), 2) -- Bay tới vị trí địch (nhích lên 5 studs)
+            InstantTeleport(closestEnemy.Position + Vector3.new(0, 3, 0))
         end
     end
 end)
 
 -- ==========================================
--- 5. KHỞI TẠO NÚT BẤM
+-- 6. KHỞI TẠO NÚT BẤM
 -- ==========================================
 CreateButton("Bay Lên Trời & Lơ Lửng", 35, function()
     TweenToPosition(skyPosition, 3)
@@ -368,7 +419,20 @@ local btnAutoTeam = CreateButton("Auto Team: OFF", 155, function()
     btnAutoTeam.TextColor3 = autoTeamEnabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
     
     if not autoTeamEnabled then
-        SetFloat(false) -- Tắt auto team thì tắt float
+        SetFloat(false)
+    end
+end)
+
+-- Nút Tốc độ chạy
+local btnSpeed = CreateButton("Speed 60: OFF", 185, function()
+    speedEnabled = not speedEnabled
+    btnSpeed.Text = "Speed 60: " .. (speedEnabled and "ON" or "OFF")
+    btnSpeed.TextColor3 = speedEnabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 255, 255)
+    
+    -- Nếu tắt thì trả về tốc độ mặc định
+    if not speedEnabled then
+        local _, hum, _ = GetCharacterParts()
+        if hum then hum.WalkSpeed = 16 end
     end
 end)
 
@@ -378,4 +442,5 @@ LocalPlayer.CharacterAdded:Connect(function()
     if activeTween then activeTween:Cancel() end
     btnFloat.Text = "Float: OFF"
     btnFloat.TextColor3 = Color3.fromRGB(255, 255, 255)
+    -- Nếu đang bật Speed thì giữ nguyên trạng thái nút, Heartbeat sẽ tự set lại sau khi hồi sinh
 end)
