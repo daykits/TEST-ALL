@@ -21,9 +21,10 @@ local isFloating = false
 local autoTeamEnabled = false
 local espEnabled = false
 local activeTween = nil
-local TargetSpeed = 100 -- ĐÃ CHỈNH TỪ 60 LÊN 100
+local TargetSpeed = 100
 local skyPosition = Vector3.new(-184.15, 1035.19, -68.42)
-local skyPositionAlt = Vector3.new(415.39, 991.87, 380.38) -- Tọa độ mới khi có vật cản vàng
+local skyPositionAlt = Vector3.new(415.39, 991.87, 380.38)
+local backroomPos = Vector3.new(-292.18, 1103.47, 70.08) -- Tọa độ né map backroom
 local MenuOpen = true
 
 --// COLORS
@@ -68,8 +69,8 @@ MenuStroke.Parent = MenuButton
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 240, 0, 220)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -110)
+MainFrame.Size = UDim2.new(0, 240, 0, 250) -- Tăng chiều cao để chứa nút mới
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -125)
 MainFrame.BackgroundColor3 = BACKGROUND
 MainFrame.BackgroundTransparency = 0.35
 MainFrame.BorderSizePixel = 0
@@ -177,12 +178,21 @@ MiscCorner.Parent = MiscTab
 --// CONTENT (MAIN)
 local Content = Instance.new("Frame")
 Content.Parent = MainFrame
-Content.Size = UDim2.new(1, -20, 0, 130)
+Content.Size = UDim2.new(1, -20, 0, 160)
 Content.Position = UDim2.new(0, 10, 0, 78)
 Content.BackgroundTransparency = 1
 Content.ZIndex = 3
 
---// NÚT BẤM MAIN
+--// CONTENT (MISC)
+local MiscContent = Instance.new("Frame")
+MiscContent.Parent = MainFrame
+MiscContent.Size = Content.Size
+MiscContent.Position = Content.Position
+MiscContent.BackgroundTransparency = 1
+MiscContent.Visible = false
+MiscContent.ZIndex = 3
+
+--// HÀM TẠO NÚT BẤM
 local function CreateButton(parent, text, posY, callback)
     local btn = Instance.new("TextButton")
     btn.Parent = parent
@@ -203,15 +213,20 @@ local function CreateButton(parent, text, posY, callback)
         task.spawn(function()
             btn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
             task.wait(0.1)
-            btn.BackgroundColor3 = BUTTON
+            if btn.Text:find("OFF") or btn.Text:find("Virex") or btn.Text:find("Scale") or btn.Text:find("Né") then
+                btn.BackgroundColor3 = BUTTON
+            else
+                btn.BackgroundColor3 = RED
+            end
         end)
         callback()
     end)
     return btn
 end
 
--- Nút Speed (Đã đổi thành 100)
-local SpeedButton = CreateButton(Content, "Speed (100) : OFF", 0, function()
+--// KHAI BÁO CÁC NÚT BẤM
+local SpeedButton
+SpeedButton = CreateButton(Content, "Speed (100) : OFF", 0, function()
     SpeedOverrideEnabled = not SpeedOverrideEnabled
     if SpeedOverrideEnabled then
         SpeedButton.Text = "Speed (100) : ON"
@@ -226,8 +241,8 @@ local SpeedButton = CreateButton(Content, "Speed (100) : OFF", 0, function()
     end
 end)
 
--- Nút Noclip
-local NoclipButton = CreateButton(Content, "Noclip : OFF", 36, function()
+local NoclipButton
+NoclipButton = CreateButton(Content, "Noclip : OFF", 36, function()
     NoclipEnabled = not NoclipEnabled
     if NoclipEnabled then
         NoclipButton.Text = "Noclip : ON"
@@ -244,8 +259,8 @@ local NoclipButton = CreateButton(Content, "Noclip : OFF", 36, function()
     end
 end)
 
--- Nút Float
-local FloatButton = CreateButton(Content, "Float : OFF", 72, function()
+local FloatButton
+FloatButton = CreateButton(Content, "Float : OFF", 72, function()
     SetFloat(not isFloating)
     if isFloating then
         FloatButton.Text = "Float : ON"
@@ -256,8 +271,8 @@ local FloatButton = CreateButton(Content, "Float : OFF", 72, function()
     end
 end)
 
--- Nút ESP
-local ESPButton = CreateButton(Content, "ESP Team : OFF", 108, function()
+local ESPButton
+ESPButton = CreateButton(Content, "ESP Team : OFF", 108, function()
     ToggleESP(not espEnabled)
     if espEnabled then
         ESPButton.Text = "ESP Team : ON"
@@ -268,17 +283,8 @@ local ESPButton = CreateButton(Content, "ESP Team : OFF", 108, function()
     end
 end)
 
---// CONTENT (MISC)
-local MiscContent = Instance.new("Frame")
-MiscContent.Parent = MainFrame
-MiscContent.Size = Content.Size
-MiscContent.Position = Content.Position
-MiscContent.BackgroundTransparency = 1
-MiscContent.Visible = false
-MiscContent.ZIndex = 3
-
--- Nút Auto Team
-local AutoTeamButton = CreateButton(MiscContent, "Auto Team : OFF", 0, function()
+local AutoTeamButton
+AutoTeamButton = CreateButton(MiscContent, "Auto Team : OFF", 0, function()
     autoTeamEnabled = not autoTeamEnabled
     if autoTeamEnabled then
         AutoTeamButton.Text = "Auto Team : ON"
@@ -290,10 +296,9 @@ local AutoTeamButton = CreateButton(MiscContent, "Auto Team : OFF", 0, function(
     end
 end)
 
--- Nút Bay lên trời
-local SkyButton = CreateButton(MiscContent, "Bay Lên Trời & Lơ Lửng", 36, function()
+local SkyButton
+SkyButton = CreateButton(MiscContent, "Bay Lên Trời & Lơ Lửng", 36, function()
     local hasObstacle = false
-    -- Kiểm tra vật cản màu vàng tại tọa độ cũ
     local rayOrigin = skyPosition + Vector3.new(0, 50, 0)
     local rayDirection = Vector3.new(0, -100, 0)
     local raycastParams = RaycastParams.new()
@@ -303,7 +308,6 @@ local SkyButton = CreateButton(MiscContent, "Bay Lên Trời & Lơ Lửng", 36, 
     local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
     if result and result.Instance then
         local color = result.Instance.Color
-        -- Kiểm tra màu vàng (RGB cao R và G, B thấp)
         if color.R > 0.6 and color.G > 0.6 and color.B < 0.4 then
             hasObstacle = true
         end
@@ -317,8 +321,18 @@ local SkyButton = CreateButton(MiscContent, "Bay Lên Trời & Lơ Lửng", 36, 
     FloatButton.BackgroundColor3 = RED
 end)
 
--- Nút Background
-local BackgroundButton = CreateButton(MiscContent, "Background : Virex", 72, function()
+-- NÚT NÉ MAP BACKROOM MỚI
+local BackroomButton
+BackroomButton = CreateButton(MiscContent, "Né Map Backroom", 72, function()
+    TweenToPosition(backroomPos, 3)
+    task.wait(3)
+    SetFloat(true)
+    FloatButton.Text = "Float : ON"
+    FloatButton.BackgroundColor3 = RED
+end)
+
+local BackgroundButton
+BackgroundButton = CreateButton(MiscContent, "Background : Virex", 108, function()
     BackgroundMode += 1
     if BackgroundMode > 3 then BackgroundMode = 1 end
 
@@ -337,14 +351,14 @@ local BackgroundButton = CreateButton(MiscContent, "Background : Virex", 72, fun
     end
 end)
 
--- Nút Scale
-local ScaleButton = CreateButton(MiscContent, "GUI Scale : 1.0x", 108, function()
+local ScaleButton
+ScaleButton = CreateButton(MiscContent, "GUI Scale : 1.0x", 144, function()
     ScaleIndex += 1
     if ScaleIndex > #ScaleOptions then ScaleIndex = 1 end
     local Scale = ScaleOptions[ScaleIndex]
     ScaleButton.Text = "GUI Scale : " .. Scale .. "x"
-    MainFrame.Size = UDim2.new(0, 240 * Scale, 0, 220 * Scale)
-    MainFrame.Position = UDim2.new(0.5, -(120 * Scale), 0.5, -(110 * Scale))
+    MainFrame.Size = UDim2.new(0, 240 * Scale, 0, 250 * Scale)
+    MainFrame.Position = UDim2.new(0.5, -(120 * Scale), 0.5, -(125 * Scale))
 end)
 
 --// TAB SWITCHING
@@ -385,7 +399,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Speed Loop (Dùng Stepped để không bị reset)
+-- Speed Loop
 RunService.Stepped:Connect(function()
     if SpeedOverrideEnabled then
         local _, hum, _ = GetCharacterParts()
@@ -518,7 +532,6 @@ RunService.Heartbeat:Connect(function()
         if lastTeam ~= "Neutral" then
             lastTeam = "Neutral"
             if (hrp.Position - skyPosition).Magnitude > 50 then
-                -- Áp dụng logic check vật cản màu vàng cho Auto Team
                 local hasObstacle = false
                 local rayOrigin = skyPosition + Vector3.new(0, 50, 0)
                 local rayDirection = Vector3.new(0, -100, 0)
@@ -612,7 +625,7 @@ end
 MenuButton.MouseButton1Click:Connect(function() SetMenuVisible(not MenuOpen) end)
 CloseButton.MouseButton1Click:Connect(function() SetMenuVisible(false) end)
 
---// CHARACTER RESPAWN (ĐÃ FIX LỖI TỰ ĐỘNG DI CHUYỂN)
+--// CHARACTER RESPAWN
 LocalPlayer.CharacterAdded:Connect(function(Character)
     task.wait(2) 
     lastTeam = nil
