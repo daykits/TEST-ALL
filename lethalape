@@ -24,7 +24,7 @@ local activeTween = nil
 local TargetSpeed = 100
 local skyPosition = Vector3.new(-184.15, 1035.19, -68.42)
 local skyPositionAlt = Vector3.new(415.39, 991.87, 380.38)
-local backroomPos = Vector3.new(-292.18, 1103.47, 70.08) -- Tọa độ né map backroom
+local backroomPos = Vector3.new(-292.18, 1103.47, 70.08)
 local MenuOpen = true
 
 --// COLORS
@@ -69,7 +69,7 @@ MenuStroke.Parent = MenuButton
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 240, 0, 250) -- Tăng chiều cao để chứa nút mới
+MainFrame.Size = UDim2.new(0, 240, 0, 250)
 MainFrame.Position = UDim2.new(0.5, -120, 0.5, -125)
 MainFrame.BackgroundColor3 = BACKGROUND
 MainFrame.BackgroundTransparency = 0.35
@@ -488,10 +488,15 @@ local function CreateESP(player)
         while espEnabled and player.Parent do
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
+            
+            -- SỬA LỖI: Kiểm tra LocalPlayer.Character và HumanoidRootPart trước khi tính toán
+            local localChar = LocalPlayer.Character
+            local localHrp = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
+            if hrp and localHrp then
                 espBox.Adornee = hrp
                 espName.Adornee = hrp
-                local distance = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Position - hrp.Position).Magnitude or 0)
+                local distance = math.floor((localHrp.Position - hrp.Position).Magnitude or 0)
                 textLabel.Text = string.format("%s [%dm]", player.Name, distance)
                 local isEnemy = (LocalPlayer.Team ~= nil and player.Team ~= nil and LocalPlayer.Team ~= player.Team)
                 local color = isEnemy and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 120)
