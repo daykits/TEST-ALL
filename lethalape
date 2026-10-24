@@ -21,8 +21,9 @@ local isFloating = false
 local autoTeamEnabled = false
 local espEnabled = false
 local activeTween = nil
-local TargetSpeed = 60
+local TargetSpeed = 100 -- ĐÃ CHỈNH TỪ 60 LÊN 100
 local skyPosition = Vector3.new(-184.15, 1035.19, -68.42)
+local skyPositionAlt = Vector3.new(415.39, 991.87, 380.38) -- Tọa độ mới khi có vật cản vàng
 local MenuOpen = true
 
 --// COLORS
@@ -209,14 +210,14 @@ local function CreateButton(parent, text, posY, callback)
     return btn
 end
 
--- Nút Speed
-local SpeedButton = CreateButton(Content, "Speed (60) : OFF", 0, function()
+-- Nút Speed (Đã đổi thành 100)
+local SpeedButton = CreateButton(Content, "Speed (100) : OFF", 0, function()
     SpeedOverrideEnabled = not SpeedOverrideEnabled
     if SpeedOverrideEnabled then
-        SpeedButton.Text = "Speed (60) : ON"
+        SpeedButton.Text = "Speed (100) : ON"
         SpeedButton.BackgroundColor3 = RED
     else
-        SpeedButton.Text = "Speed (60) : OFF"
+        SpeedButton.Text = "Speed (100) : OFF"
         SpeedButton.BackgroundColor3 = BUTTON
         local Character = LocalPlayer.Character
         if Character and Character:FindFirstChildOfClass("Humanoid") then
@@ -291,7 +292,25 @@ end)
 
 -- Nút Bay lên trời
 local SkyButton = CreateButton(MiscContent, "Bay Lên Trời & Lơ Lửng", 36, function()
-    TweenToPosition(skyPosition, 3)
+    local hasObstacle = false
+    -- Kiểm tra vật cản màu vàng tại tọa độ cũ
+    local rayOrigin = skyPosition + Vector3.new(0, 50, 0)
+    local rayDirection = Vector3.new(0, -100, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    
+    local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    if result and result.Instance then
+        local color = result.Instance.Color
+        -- Kiểm tra màu vàng (RGB cao R và G, B thấp)
+        if color.R > 0.6 and color.G > 0.6 and color.B < 0.4 then
+            hasObstacle = true
+        end
+    end
+    
+    local targetPos = hasObstacle and skyPositionAlt or skyPosition
+    TweenToPosition(targetPos, 3)
     task.wait(3)
     SetFloat(true)
     FloatButton.Text = "Float : ON"
@@ -499,7 +518,24 @@ RunService.Heartbeat:Connect(function()
         if lastTeam ~= "Neutral" then
             lastTeam = "Neutral"
             if (hrp.Position - skyPosition).Magnitude > 50 then
-                TweenToPosition(skyPosition, 5)
+                -- Áp dụng logic check vật cản màu vàng cho Auto Team
+                local hasObstacle = false
+                local rayOrigin = skyPosition + Vector3.new(0, 50, 0)
+                local rayDirection = Vector3.new(0, -100, 0)
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                
+                local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                if result and result.Instance then
+                    local color = result.Instance.Color
+                    if color.R > 0.6 and color.G > 0.6 and color.B < 0.4 then
+                        hasObstacle = true
+                    end
+                end
+                
+                local targetPos = hasObstacle and skyPositionAlt or skyPosition
+                TweenToPosition(targetPos, 5)
                 SetFloat(true)
             end
         end
@@ -576,9 +612,16 @@ end
 MenuButton.MouseButton1Click:Connect(function() SetMenuVisible(not MenuOpen) end)
 CloseButton.MouseButton1Click:Connect(function() SetMenuVisible(false) end)
 
---// CHARACTER RESPAWN
+--// CHARACTER RESPAWN (ĐÃ FIX LỖI TỰ ĐỘNG DI CHUYỂN)
 LocalPlayer.CharacterAdded:Connect(function(Character)
-    task.wait(1)
+    task.wait(2) 
+    lastTeam = nil
+    lastAutoTween = 0
+    isFloating = false
+    if FloatButton then
+        FloatButton.Text = "Float : OFF"
+        FloatButton.BackgroundColor3 = BUTTON
+    end
     if SpeedOverrideEnabled then
         local Humanoid = Character:FindFirstChildOfClass("Humanoid")
         if Humanoid then Humanoid.WalkSpeed = TargetSpeed end
