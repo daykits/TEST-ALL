@@ -1,10 +1,14 @@
 -- ========================================
--- GET KEY MENU - datkits Hub (CÓ LƯU KEY)
+-- GET KEY MENU - datkits Hub (CÓ LƯU KEY + GET KEY)
 -- Key đúng: daykits-vip
 -- ========================================
 
-local SCRIPT_URL = "https://pastefy.app/SpJWRA2b/raw"  -- 🔥 THAY LINK NÀY
+local SCRIPT_URL = "https://raw.githubusercontent.com/daykits/roblox-scripts/refs/heads/main/daykits_banana" -- 🔥 THAY LINK NÀY
 local VALID_KEY = "daykits-vip"
+
+-- 🔥 Link lấy key (Discord, website, v.v.)
+local GETKEY_URL = "https://discord.gg/RGYAuHX9j"        -- 🔥 THAY LINK NÀY
+local GETKEY_TYPE = "discord"  -- "discord" hoặc "web"
 
 local SAVE_FOLDER = "datkits_hub"
 local SAVE_FILE = SAVE_FOLDER .. "/key.txt"
@@ -17,25 +21,19 @@ if makefolder and not isfolder(SAVE_FOLDER) then
 end
 
 -- ========================================
--- 1. HÀM XỬ LÝ KEY (LƯU / ĐỌC / XÓA)
+-- 1. HÀM XỬ LÝ KEY
 -- ========================================
 local function SaveKey(key)
     if not writefile then return false end
-    local ok = pcall(function()
-        writefile(SAVE_FILE, key)
-    end)
+    local ok = pcall(function() writefile(SAVE_FILE, key) end)
     return ok
 end
 
 local function LoadKey()
     if not (isfile and readfile) then return nil end
     if not isfile(SAVE_FILE) then return nil end
-    local ok, data = pcall(function()
-        return readfile(SAVE_FILE)
-    end)
-    if ok and data then
-        return data
-    end
+    local ok, data = pcall(function() return readfile(SAVE_FILE) end)
+    if ok and data then return data end
     return nil
 end
 
@@ -202,7 +200,7 @@ SaveCheckLabel.Font = Enum.Font.Gotham
 SaveCheckLabel.TextXAlignment = Enum.TextXAlignment.Left
 SaveCheckLabel.Parent = SaveCheckFrame
 
-local saveKeyChecked = true -- mặc định bật
+local saveKeyChecked = true
 
 local function UpdateCheckbox()
     if saveKeyChecked then
@@ -215,7 +213,6 @@ local function UpdateCheckbox()
         SaveCheckbox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     end
 end
-
 UpdateCheckbox()
 
 SaveCheckbox.MouseButton1Click:Connect(function()
@@ -237,25 +234,48 @@ StatusLabel.Font = Enum.Font.GothamMedium
 StatusLabel.Parent = MainFrame
 
 -- ========================================
--- 8. NÚT CHECK KEY
+-- 8. NÚT "GET KEY" + "CHECK KEY" (2 nút ngang nhau)
 -- ========================================
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Size = UDim2.new(0.85, 0, 0, 45)
+ButtonContainer.Position = UDim2.new(0.075, 0, 0, 210)
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Parent = MainFrame
+
+-- 🔹 Nút GET KEY (bên trái, 40% chiều rộng)
+local GetKeyButton = Instance.new("TextButton")
+GetKeyButton.Size = UDim2.new(0.4, -5, 1, 0)
+GetKeyButton.Position = UDim2.new(0, 0, 0, 0)
+GetKeyButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)  -- Màu Discord xanh
+GetKeyButton.BorderSizePixel = 0
+GetKeyButton.Text = "🔗 GET KEY"
+GetKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetKeyButton.TextSize = 15
+GetKeyButton.Font = Enum.Font.GothamBold
+GetKeyButton.Parent = ButtonContainer
+
+local GetKeyCorner = Instance.new("UICorner")
+GetKeyCorner.CornerRadius = UDim.new(0, 8)
+GetKeyCorner.Parent = GetKeyButton
+
+-- 🔹 Nút CHECK KEY (bên phải, 60% chiều rộng)
 local Button = Instance.new("TextButton")
-Button.Size = UDim2.new(0.85, 0, 0, 45)
-Button.Position = UDim2.new(0.075, 0, 0, 210)
+Button.Size = UDim2.new(0.6, -5, 1, 0)
+Button.Position = UDim2.new(0.4, 5, 0, 0)
 Button.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 Button.BorderSizePixel = 0
 Button.Text = "🔓 KIỂM TRA KEY"
 Button.TextColor3 = Color3.fromRGB(15, 15, 20)
-Button.TextSize = 16
+Button.TextSize = 15
 Button.Font = Enum.Font.GothamBold
-Button.Parent = MainFrame
+Button.Parent = ButtonContainer
 
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(0, 8)
 ButtonCorner.Parent = Button
 
 -- ========================================
--- 9. NÚT XÓA KEY ĐÃ LƯU (nhỏ, góc phải dưới)
+-- 9. NÚT XÓA KEY ĐÃ LƯU
 -- ========================================
 local ClearButton = Instance.new("TextButton")
 ClearButton.Size = UDim2.new(0, 100, 0, 20)
@@ -320,6 +340,7 @@ local function UnlockScript()
     Button.Text = "✅ ĐANG TẢI..."
     Button.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
     Button.Active = false
+    GetKeyButton.Active = false
 
     task.wait(0.8)
 
@@ -331,7 +352,6 @@ local function UnlockScript()
     task.wait(0.5)
     ScreenGui:Destroy()
 
-    -- 🔥 CHẠY SCRIPT CHÍNH
     local success, err = pcall(function()
         local source = game:HttpGet(SCRIPT_URL)
         local func, loadErr = loadstring(source)
@@ -382,7 +402,6 @@ local function CheckKey(isAuto)
     end
 
     if inputKey == VALID_KEY then
-        -- ✅ LƯU KEY NẾU CHECKBOX BẬT
         if saveKeyChecked and not isAuto then
             local saved = SaveKey(inputKey)
             if saved then
@@ -404,14 +423,121 @@ local function CheckKey(isAuto)
 end
 
 -- ========================================
--- 13. SỰ KIỆN
+-- 13. XỬ LÝ NÚT GET KEY
+-- ========================================
+local function OpenGetKey()
+    -- Thông báo ngắn
+    ShowStatus("🔗 Đang mở link lấy key...", Color3.fromRGB(88, 101, 242))
+
+    if GETKEY_TYPE == "discord" then
+        -- Copy link Discord vào clipboard + mở
+        if setclipboard then
+            pcall(function() setclipboard(GETKEY_URL) end)
+        end
+
+        -- Hiển thị popup hướng dẫn
+        local popupGui = Instance.new("ScreenGui")
+        popupGui.Name = "datkits_GetKeyPopup"
+        popupGui.ResetOnSpawn = false
+        popupGui.DisplayOrder = 10000
+        pcall(function() popupGui.Parent = CoreGui end)
+        if not popupGui.Parent then
+            popupGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        end
+
+        local PopupFrame = Instance.new("Frame")
+        PopupFrame.Size = UDim2.new(0, 380, 0, 220)
+        PopupFrame.Position = UDim2.new(0.5, -190, 0.5, -110)
+        PopupFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+        PopupFrame.BorderSizePixel = 0
+        PopupFrame.Parent = popupGui
+
+        local PopupCorner = Instance.new("UICorner")
+        PopupCorner.CornerRadius = UDim.new(0, 12)
+        PopupCorner.Parent = PopupFrame
+
+        local PopupStroke = Instance.new("UIStroke")
+        PopupStroke.Color = Color3.fromRGB(88, 101, 242)
+        PopupStroke.Thickness = 2
+        PopupStroke.Parent = PopupFrame
+
+        local PopupTitle = Instance.new("TextLabel")
+        PopupTitle.Size = UDim2.new(1, 0, 0, 40)
+        PopupTitle.Position = UDim2.new(0, 0, 0, 15)
+        PopupTitle.BackgroundTransparency = 1
+        PopupTitle.Text = "🔗 LẤY KEY TẠI DISCORD"
+        PopupTitle.TextColor3 = Color3.fromRGB(88, 101, 242)
+        PopupTitle.TextSize = 16
+        PopupTitle.Font = Enum.Font.GothamBold
+        PopupTitle.Parent = PopupFrame
+
+        local PopupLink = Instance.new("TextBox")
+        PopupLink.Size = UDim2.new(0.85, 0, 0, 40)
+        PopupLink.Position = UDim2.new(0.075, 0, 0, 65)
+        PopupLink.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+        PopupLink.BorderSizePixel = 0
+        PopupLink.Text = GETKEY_URL
+        PopupLink.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PopupLink.TextSize = 12
+        PopupLink.Font = Enum.Font.Gotham
+        PopupLink.TextEditable = false
+        PopupLink.ClearTextOnFocus = false
+        PopupLink.Parent = PopupFrame
+
+        local LinkCorner = Instance.new("UICorner")
+        LinkCorner.CornerRadius = UDim.new(0, 6)
+        LinkCorner.Parent = PopupLink
+
+        local PopupInfo = Instance.new("TextLabel")
+        PopupInfo.Size = UDim2.new(0.85, 0, 0, 40)
+        PopupInfo.Position = UDim2.new(0.075, 0, 0, 110)
+        PopupInfo.BackgroundTransparency = 1
+        PopupInfo.Text = "📋 Link đã được copy vào clipboard.\nDán vào trình duyệt để lấy key!"
+        PopupInfo.TextColor3 = Color3.fromRGB(180, 180, 180)
+        PopupInfo.TextSize = 12
+        PopupInfo.Font = Enum.Font.Gotham
+        PopupInfo.TextWrapped = true
+        PopupInfo.Parent = PopupFrame
+
+        local PopupClose = Instance.new("TextButton")
+        PopupClose.Size = UDim2.new(0.85, 0, 0, 35)
+        PopupClose.Position = UDim2.new(0.075, 0, 0, 165)
+        PopupClose.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        PopupClose.BorderSizePixel = 0
+        PopupClose.Text = "✓ ĐÃ HIỂU"
+        PopupClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PopupClose.TextSize = 14
+        PopupClose.Font = Enum.Font.GothamBold
+        PopupClose.Parent = PopupFrame
+
+        local CloseCorner = Instance.new("UICorner")
+        CloseCorner.CornerRadius = UDim.new(0, 8)
+        CloseCorner.Parent = PopupClose
+
+        PopupClose.MouseButton1Click:Connect(function()
+            popupGui:Destroy()
+        end)
+
+    elseif GETKEY_TYPE == "web" then
+        -- Mở trình duyệt (nếu executor hỗ trợ)
+        if setclipboard then
+            pcall(function() setclipboard(GETKEY_URL) end)
+        end
+        ShowStatus("🔗 Đã copy link! Dán vào trình duyệt.", Color3.fromRGB(88, 101, 242))
+    end
+end
+
+-- ========================================
+-- 14. SỰ KIỆN
 -- ========================================
 Button.MouseButton1Click:Connect(function() CheckKey(false) end)
+GetKeyButton.MouseButton1Click:Connect(OpenGetKey)
 
 TextBox.FocusLost:Connect(function(enterPressed)
     if enterPressed then CheckKey(false) end
 end)
 
+-- Hover effects
 Button.MouseEnter:Connect(function()
     if not isUnlocked then
         TweenService:Create(Button, TweenInfo.new(0.2), {
@@ -419,7 +545,6 @@ Button.MouseEnter:Connect(function()
         }):Play()
     end
 end)
-
 Button.MouseLeave:Connect(function()
     if not isUnlocked then
         TweenService:Create(Button, TweenInfo.new(0.2), {
@@ -428,24 +553,36 @@ Button.MouseLeave:Connect(function()
     end
 end)
 
+GetKeyButton.MouseEnter:Connect(function()
+    if not isUnlocked then
+        TweenService:Create(GetKeyButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(115, 128, 255)
+        }):Play()
+    end
+end)
+GetKeyButton.MouseLeave:Connect(function()
+    if not isUnlocked then
+        TweenService:Create(GetKeyButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+        }):Play()
+    end
+end)
+
 -- ========================================
--- 14. TỰ ĐỘNG CHECK KEY ĐÃ LƯU KHI MỞ SCRIPT
+-- 15. AUTO CHECK KEY ĐÃ LƯU
 -- ========================================
 task.spawn(function()
     local savedKey = LoadKey()
     if savedKey and savedKey == VALID_KEY then
-        -- Có key đã lưu và đúng → auto unlock
         ShowStatus("🔑 Đã tìm thấy key đã lưu, đang mở khóa...", Color3.fromRGB(80, 255, 80))
         TextBox.Text = savedKey
         task.wait(0.5)
         CheckKey(true)
     elseif savedKey then
-        -- Key đã lưu nhưng SAI (có thể bị đổi key) → xóa
         ClearKey()
         ShowStatus("⚠ Key đã lưu không còn hợp lệ. Vui lòng nhập lại.", Color3.fromRGB(255, 200, 100))
     else
-        -- Không có key đã lưu
-        ShowStatus("💡 Nhập key để mở khóa script", Color3.fromRGB(180, 180, 180))
+        ShowStatus("💡 Nhập key hoặc nhấn GET KEY để lấy key", Color3.fromRGB(180, 180, 180))
     end
 end)
 
