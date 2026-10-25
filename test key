@@ -1,1 +1,452 @@
+-- ========================================
+-- GET KEY MENU - datkits Hub (CÓ LƯU KEY)
+-- Key đúng: daykits-vip
+-- ========================================
 
+local SCRIPT_URL = "https://pastefy.app/SpJWRA2b/raw"  -- 🔥 THAY LINK NÀY
+local VALID_KEY = "daykits-vip"
+
+local SAVE_FOLDER = "datkits_hub"
+local SAVE_FILE = SAVE_FOLDER .. "/key.txt"
+
+-- ========================================
+-- 0. TẠO FOLDER SAVE
+-- ========================================
+if makefolder and not isfolder(SAVE_FOLDER) then
+    pcall(function() makefolder(SAVE_FOLDER) end)
+end
+
+-- ========================================
+-- 1. HÀM XỬ LÝ KEY (LƯU / ĐỌC / XÓA)
+-- ========================================
+local function SaveKey(key)
+    if not writefile then return false end
+    local ok = pcall(function()
+        writefile(SAVE_FILE, key)
+    end)
+    return ok
+end
+
+local function LoadKey()
+    if not (isfile and readfile) then return nil end
+    if not isfile(SAVE_FILE) then return nil end
+    local ok, data = pcall(function()
+        return readfile(SAVE_FILE)
+    end)
+    if ok and data then
+        return data
+    end
+    return nil
+end
+
+local function ClearKey()
+    if delfile and isfile(SAVE_FILE) then
+        pcall(function() delfile(SAVE_FILE) end)
+    end
+end
+
+-- ========================================
+-- 2. TẠO GUI
+-- ========================================
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+if CoreGui:FindFirstChild("datkits_KeySystem") then
+    CoreGui.datkits_KeySystem:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "datkits_KeySystem"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 9999
+pcall(function() ScreenGui.Parent = CoreGui end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- ========================================
+-- 3. MAIN FRAME
+-- ========================================
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 420, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(255, 215, 0)
+Stroke.Thickness = 2
+Stroke.Parent = MainFrame
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = MainFrame
+
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 35)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 15)),
+})
+Gradient.Rotation = 90
+Gradient.Parent = MainFrame
+
+-- ========================================
+-- 4. TITLE / SUBTITLE
+-- ========================================
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Position = UDim2.new(0, 0, 0, 15)
+Title.BackgroundTransparency = 1
+Title.Text = "🔑 DATKITS HUB - KEY SYSTEM"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(1, 0, 0, 20)
+Subtitle.Position = UDim2.new(0, 0, 0, 55)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "Nhập key để sử dụng script"
+Subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
+Subtitle.TextSize = 13
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.Parent = MainFrame
+
+-- ========================================
+-- 5. INPUT BOX
+-- ========================================
+local InputFrame = Instance.new("Frame")
+InputFrame.Size = UDim2.new(0.85, 0, 0, 45)
+InputFrame.Position = UDim2.new(0.075, 0, 0, 95)
+InputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+InputFrame.BorderSizePixel = 0
+InputFrame.Parent = MainFrame
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 8)
+InputCorner.Parent = InputFrame
+
+local InputStroke = Instance.new("UIStroke")
+InputStroke.Color = Color3.fromRGB(80, 80, 100)
+InputStroke.Thickness = 1
+InputStroke.Parent = InputFrame
+
+local TextBox = Instance.new("TextBox")
+TextBox.Size = UDim2.new(1, -20, 1, 0)
+TextBox.Position = UDim2.new(0, 15, 0, 0)
+TextBox.BackgroundTransparency = 1
+TextBox.Text = ""
+TextBox.PlaceholderText = "Nhập key tại đây..."
+TextBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TextBox.TextSize = 15
+TextBox.Font = Enum.Font.Gotham
+TextBox.TextXAlignment = Enum.TextXAlignment.Left
+TextBox.ClearTextOnFocus = false
+TextBox.Parent = InputFrame
+
+-- ========================================
+-- 6. CHECKBOX "LƯU KEY"
+-- ========================================
+local SaveCheckFrame = Instance.new("Frame")
+SaveCheckFrame.Size = UDim2.new(0.85, 0, 0, 25)
+SaveCheckFrame.Position = UDim2.new(0.075, 0, 0, 148)
+SaveCheckFrame.BackgroundTransparency = 1
+SaveCheckFrame.Parent = MainFrame
+
+local SaveCheckbox = Instance.new("TextButton")
+SaveCheckbox.Size = UDim2.new(0, 18, 0, 18)
+SaveCheckbox.Position = UDim2.new(0, 0, 0, 3)
+SaveCheckbox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+SaveCheckbox.BorderSizePixel = 0
+SaveCheckbox.Text = ""
+SaveCheckbox.AutoButtonColor = false
+SaveCheckbox.Parent = SaveCheckFrame
+
+local CheckCorner = Instance.new("UICorner")
+CheckCorner.CornerRadius = UDim.new(0, 4)
+CheckCorner.Parent = SaveCheckbox
+
+local CheckStroke = Instance.new("UIStroke")
+CheckStroke.Color = Color3.fromRGB(80, 80, 100)
+CheckStroke.Thickness = 1
+CheckStroke.Parent = SaveCheckbox
+
+local CheckMark = Instance.new("TextLabel")
+CheckMark.Size = UDim2.new(1, 0, 1, 0)
+CheckMark.BackgroundTransparency = 1
+CheckMark.Text = "✓"
+CheckMark.TextColor3 = Color3.fromRGB(255, 215, 0)
+CheckMark.TextSize = 16
+CheckMark.Font = Enum.Font.GothamBold
+CheckMark.Visible = false
+CheckMark.Parent = SaveCheckbox
+
+local SaveCheckLabel = Instance.new("TextLabel")
+SaveCheckLabel.Size = UDim2.new(1, -25, 1, 0)
+SaveCheckLabel.Position = UDim2.new(0, 25, 0, 0)
+SaveCheckLabel.BackgroundTransparency = 1
+SaveCheckLabel.Text = "Lưu key cho lần sau"
+SaveCheckLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SaveCheckLabel.TextSize = 13
+SaveCheckLabel.Font = Enum.Font.Gotham
+SaveCheckLabel.TextXAlignment = Enum.TextXAlignment.Left
+SaveCheckLabel.Parent = SaveCheckFrame
+
+local saveKeyChecked = true -- mặc định bật
+
+local function UpdateCheckbox()
+    if saveKeyChecked then
+        CheckMark.Visible = true
+        CheckStroke.Color = Color3.fromRGB(255, 215, 0)
+        SaveCheckbox.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    else
+        CheckMark.Visible = false
+        CheckStroke.Color = Color3.fromRGB(80, 80, 100)
+        SaveCheckbox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    end
+end
+
+UpdateCheckbox()
+
+SaveCheckbox.MouseButton1Click:Connect(function()
+    saveKeyChecked = not saveKeyChecked
+    UpdateCheckbox()
+end)
+
+-- ========================================
+-- 7. STATUS LABEL
+-- ========================================
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0.85, 0, 0, 25)
+StatusLabel.Position = UDim2.new(0.075, 0, 0, 180)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = ""
+StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+StatusLabel.TextSize = 13
+StatusLabel.Font = Enum.Font.GothamMedium
+StatusLabel.Parent = MainFrame
+
+-- ========================================
+-- 8. NÚT CHECK KEY
+-- ========================================
+local Button = Instance.new("TextButton")
+Button.Size = UDim2.new(0.85, 0, 0, 45)
+Button.Position = UDim2.new(0.075, 0, 0, 210)
+Button.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+Button.BorderSizePixel = 0
+Button.Text = "🔓 KIỂM TRA KEY"
+Button.TextColor3 = Color3.fromRGB(15, 15, 20)
+Button.TextSize = 16
+Button.Font = Enum.Font.GothamBold
+Button.Parent = MainFrame
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = Button
+
+-- ========================================
+-- 9. NÚT XÓA KEY ĐÃ LƯU (nhỏ, góc phải dưới)
+-- ========================================
+local ClearButton = Instance.new("TextButton")
+ClearButton.Size = UDim2.new(0, 100, 0, 20)
+ClearButton.Position = UDim2.new(1, -110, 0, 268)
+ClearButton.BackgroundTransparency = 1
+ClearButton.Text = "🗑 Xóa key đã lưu"
+ClearButton.TextColor3 = Color3.fromRGB(150, 100, 100)
+ClearButton.TextSize = 11
+ClearButton.Font = Enum.Font.Gotham
+ClearButton.Parent = MainFrame
+
+ClearButton.MouseButton1Click:Connect(function()
+    ClearKey()
+    StatusLabel.Text = "🗑 Đã xóa key đã lưu"
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+end)
+
+-- ========================================
+-- 10. FOOTER
+-- ========================================
+local Footer = Instance.new("TextLabel")
+Footer.Size = UDim2.new(1, 0, 0, 20)
+Footer.Position = UDim2.new(0, 0, 1, -30)
+Footer.BackgroundTransparency = 1
+Footer.Text = "© datkits Hub • by datdaykits"
+Footer.TextColor3 = Color3.fromRGB(100, 100, 120)
+Footer.TextSize = 11
+Footer.Font = Enum.Font.Gotham
+Footer.Parent = MainFrame
+
+-- ========================================
+-- 11. ANIMATION
+-- ========================================
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 420, 0, 320)
+}):Play()
+
+-- ========================================
+-- 12. LOGIC CHÍNH
+-- ========================================
+local isChecking = false
+local isUnlocked = false
+
+local function ShowStatus(text, color)
+    StatusLabel.Text = text
+    StatusLabel.TextColor3 = color
+end
+
+local function ShakeFrame()
+    local originalPos = MainFrame.Position
+    for i = 1, 5 do
+        MainFrame.Position = originalPos + UDim2.new(0, (i % 2 == 0 and 8 or -8), 0, 0)
+        task.wait(0.03)
+    end
+    MainFrame.Position = originalPos
+end
+
+local function UnlockScript()
+    isUnlocked = true
+    ShowStatus("✅ Key hợp lệ! Đang tải script...", Color3.fromRGB(80, 255, 80))
+    Button.Text = "✅ ĐANG TẢI..."
+    Button.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+    Button.Active = false
+
+    task.wait(0.8)
+
+    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+
+    task.wait(0.5)
+    ScreenGui:Destroy()
+
+    -- 🔥 CHẠY SCRIPT CHÍNH
+    local success, err = pcall(function()
+        local source = game:HttpGet(SCRIPT_URL)
+        local func, loadErr = loadstring(source)
+        if not func then
+            error("Loadstring thất bại: " .. tostring(loadErr))
+        end
+        func()
+    end)
+
+    if not success then
+        warn("[datkits Hub] Lỗi load script:", err)
+        local errGui = Instance.new("ScreenGui")
+        errGui.Parent = CoreGui
+        local errFrame = Instance.new("Frame")
+        errFrame.Size = UDim2.new(0, 400, 0, 100)
+        errFrame.Position = UDim2.new(0.5, -200, 0.5, -50)
+        errFrame.BackgroundColor3 = Color3.fromRGB(40, 10, 10)
+        errFrame.BorderSizePixel = 0
+        errFrame.Parent = errGui
+        local errCorner = Instance.new("UICorner")
+        errCorner.CornerRadius = UDim.new(0, 10)
+        errCorner.Parent = errFrame
+        local errText = Instance.new("TextLabel")
+        errText.Size = UDim2.new(1, -20, 1, -20)
+        errText.Position = UDim2.new(0, 10, 0, 10)
+        errText.BackgroundTransparency = 1
+        errText.Text = "❌ Lỗi khi tải script:\n" .. tostring(err)
+        errText.TextColor3 = Color3.fromRGB(255, 100, 100)
+        errText.TextSize = 13
+        errText.Font = Enum.Font.Gotham
+        errText.TextWrapped = true
+        errText.Parent = errFrame
+        task.delay(5, function() errGui:Destroy() end)
+    end
+end
+
+local function CheckKey(isAuto)
+    if isChecking or isUnlocked then return end
+    isChecking = true
+
+    local inputKey = TextBox.Text
+
+    if not isAuto then
+        ShowStatus("⏳ Đang kiểm tra key...", Color3.fromRGB(255, 200, 50))
+        Button.Text = "⏳ ĐANG KIỂM TRA..."
+        Button.Active = false
+        task.wait(0.6)
+    end
+
+    if inputKey == VALID_KEY then
+        -- ✅ LƯU KEY NẾU CHECKBOX BẬT
+        if saveKeyChecked and not isAuto then
+            local saved = SaveKey(inputKey)
+            if saved then
+                ShowStatus("✅ Key đúng! Đã lưu key.", Color3.fromRGB(80, 255, 80))
+            else
+                ShowStatus("✅ Key đúng! (Không lưu được key)", Color3.fromRGB(255, 200, 100))
+            end
+        end
+        UnlockScript()
+    else
+        ShowStatus("❌ Key không hợp lệ! Vui lòng thử lại.", Color3.fromRGB(255, 80, 80))
+        ShakeFrame()
+        Button.Text = "🔓 KIỂM TRA KEY"
+        Button.Active = true
+        TextBox.Text = ""
+    end
+
+    isChecking = false
+end
+
+-- ========================================
+-- 13. SỰ KIỆN
+-- ========================================
+Button.MouseButton1Click:Connect(function() CheckKey(false) end)
+
+TextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then CheckKey(false) end
+end)
+
+Button.MouseEnter:Connect(function()
+    if not isUnlocked then
+        TweenService:Create(Button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(255, 235, 100)
+        }):Play()
+    end
+end)
+
+Button.MouseLeave:Connect(function()
+    if not isUnlocked then
+        TweenService:Create(Button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+        }):Play()
+    end
+end)
+
+-- ========================================
+-- 14. TỰ ĐỘNG CHECK KEY ĐÃ LƯU KHI MỞ SCRIPT
+-- ========================================
+task.spawn(function()
+    local savedKey = LoadKey()
+    if savedKey and savedKey == VALID_KEY then
+        -- Có key đã lưu và đúng → auto unlock
+        ShowStatus("🔑 Đã tìm thấy key đã lưu, đang mở khóa...", Color3.fromRGB(80, 255, 80))
+        TextBox.Text = savedKey
+        task.wait(0.5)
+        CheckKey(true)
+    elseif savedKey then
+        -- Key đã lưu nhưng SAI (có thể bị đổi key) → xóa
+        ClearKey()
+        ShowStatus("⚠ Key đã lưu không còn hợp lệ. Vui lòng nhập lại.", Color3.fromRGB(255, 200, 100))
+    else
+        -- Không có key đã lưu
+        ShowStatus("💡 Nhập key để mở khóa script", Color3.fromRGB(180, 180, 180))
+    end
+end)
+
+print("[datkits Hub] Key System khởi động. Key: daykits-vip")
