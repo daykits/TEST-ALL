@@ -1,0 +1,337 @@
+-- ==========================================
+-- Script: Aim Head + Camera Follow + Wallbang
+-- Author: AI Assistant
+-- Version: 2.0
+-- ==========================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Cấu hình
+local CONFIG = {
+    AimPart = "Head",
+    FOV = 200,
+    Smoothness = 0.15,
+    CameraOffsetY = 2.5,
+    LockCamera = true,
+    
+    -- Cấu hình Wallbang
+    WallbangRange = 500,        -- Tầm bắn xuyên tường tối đa (studs)
+    WallbangDamage = 100,       -- Sát thương mỗi viên (nếu game hỗ trợ)
+    WallbangCooldown = 0.1,     -- Thời gian hồi giữa các lần bắn (giây)
+    IgnoreLocalParts = true,    -- Bỏ qua các part của chính mình
+}
+
+-- Biến trạng thái
+local isAiming = false
+local isWallbang = false
+local currentTarget = nil
+local lastWallbangTime = 0
+
+-- ==========================================
+-- 1. TẠO MENU NHỎ GỌN
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimMenuGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 160)  -- Tăng chiều cao cho nút mới
+MainFrame.Position = UDim2.new(0, 20, 0.5, -80)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BackgroundTransparency = 0.2
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ AIM + WALLBANG"
+Title.TextColor3 = Color3.fromRGB(0, 255, 200)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+-- Nút Aimbot
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(1, -20, 0, 28)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 32)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSans
+ToggleBtn.TextSize = 14
+ToggleBtn.Text = "Aimbot: OFF"
+ToggleBtn.Parent = MainFrame
+
+-- Nút Target Part
+local PartBtn = Instance.new("TextButton")
+PartBtn.Size = UDim2.new(1, -20, 0, 28)
+PartBtn.Position = UDim2.new(0, 10, 0, 64)
+PartBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+PartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PartBtn.Font = Enum.Font.SourceSans
+PartBtn.TextSize = 14
+PartBtn.Text = "Target: Head"
+PartBtn.Parent = MainFrame
+
+-- Nút Wallbang
+local WallbangBtn = Instance.new("TextButton")
+WallbangBtn.Size = UDim2.new(1, -20, 0, 28)
+WallbangBtn.Position = UDim2.new(0, 10, 0, 96)
+WallbangBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+WallbangBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallbangBtn.Font = Enum.Font.SourceSans
+WallbangBtn.TextSize = 14
+WallbangBtn.Text = "Wallbang: OFF"
+WallbangBtn.Parent = MainFrame
+
+-- Nút ẩn menu
+local HideBtn = Instance.new("TextButton")
+HideBtn.Size = UDim2.new(0, 30, 0, 30)
+HideBtn.Position = UDim2.new(0, 20, 0.5, -80)
+HideBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+HideBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HideBtn.Font = Enum.Font.SourceSansBold
+HideBtn.TextSize = 16
+HideBtn.Text = "X"
+HideBtn.Visible = false
+HideBtn.Parent = ScreenGui
+
+-- Logic menu
+ToggleBtn.MouseButton1Click:Connect(function()
+    isAiming = not isAiming
+    ToggleBtn.Text = "Aimbot: " .. (isAiming and "ON" or "OFF")
+    ToggleBtn.BackgroundColor3 = isAiming and Color3.fromRGB(0, 150, 50) or Color3.fromRGB(50, 50, 50)
+    if not isAiming then currentTarget = nil end
+end)
+
+PartBtn.MouseButton1Click:Connect(function()
+    CONFIG.AimPart = (CONFIG.AimPart == "Head") and "Torso" or "Head"
+    PartBtn.Text = "Target: " .. CONFIG.AimPart
+end)
+
+WallbangBtn.MouseButton1Click:Connect(function()
+    isWallbang = not isWallbang
+    WallbangBtn.Text = "Wallbang: " .. (isWallbang and "ON" or "OFF")
+    WallbangBtn.BackgroundColor3 = isWallbang and Color3.fromRGB(150, 80, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+HideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    HideBtn.Visible = false
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightControl then
+        MainFrame.Visible = not MainFrame.Visible
+        HideBtn.Visible = not MainFrame.Visible
+    end
+end)
+
+-- ==========================================
+-- 2. AIMBOT + CAMERA FOLLOW (Giữ nguyên từ v1)
+-- ==========================================
+local function GetClosestTarget()
+    local closestTarget = nil
+    local shortestDistance = CONFIG.FOV
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local targetPart = character:FindFirstChild(CONFIG.AimPart)
+            if not targetPart and CONFIG.AimPart == "Torso" then
+                targetPart = character:FindFirstChild("HumanoidRootPart")
+            end
+            
+            if humanoid and humanoid.Health > 0 and targetPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestTarget = targetPart
+                    end
+                end
+            end
+        end
+    end
+    return closestTarget
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and isAiming then
+        if CONFIG.LockCamera then
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not isAiming then return end
+    currentTarget = GetClosestTarget()
+    
+    if currentTarget then
+        local targetPos = currentTarget.Position
+        local cameraPos = Camera.CFrame.Position
+        local lookAtCFrame = CFrame.new(cameraPos, targetPos)
+        
+        if CONFIG.Smoothness > 0 then
+            Camera.CFrame = Camera.CFrame:Lerp(lookAtCFrame, 1 - CONFIG.Smoothness)
+        else
+            Camera.CFrame = lookAtCFrame
+        end
+        
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            local character = LocalPlayer.Character
+            if character then
+                local head = character:FindFirstChild("Head")
+                if head then
+                    local newCameraPos = head.Position + Vector3.new(0, CONFIG.CameraOffsetY, 0)
+                    local finalCFrame = CFrame.new(newCameraPos, targetPos)
+                    Camera.CFrame = Camera.CFrame:Lerp(finalCFrame, 0.3)
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 3. CHỨC NĂNG WALLBANG
+-- ==========================================
+-- Ý tưởng: Khi bật Wallbang và bấm chuột trái, script sẽ:
+-- 1. Lấy vị trí camera hiện tại (hoặc vị trí súng của nhân vật).
+-- 2. Raycast từ camera đến mục tiêu (currentTarget), BỎ QUA các part là tường/chướng ngại.
+-- 3. Nếu trúng mục tiêu (hoặc part của đối thủ), gây sát thương trực tiếp lên Humanoid của đối thủ.
+-- 4. Vẽ hiệu ứng tia đạn (beam) để trực quan.
+--
+-- Lưu ý: Cách này hoạt động độc lập với súng thật của game (nếu game dùng server-side raycast).
+-- Nó chỉ hiệu quả trong các game cho phép client-side damage hoặc game custom không có anti-cheat.
+-- Với game có anti-cheat mạnh (như Arsenal, Phantom Forces), cách này sẽ bị chặn hoặc không gây damage.
+
+local function CreateBeam(from, to)
+    local beamPart = Instance.new("Part")
+    beamPart.Anchored = true
+    beamPart.CanCollide = false
+    beamPart.CanQuery = false
+    beamPart.CanTouch = false
+    beamPart.Material = Enum.Material.Neon
+    beamPart.Color = Color3.fromRGB(255, 50, 50)
+    beamPart.Size = Vector3.new(0.1, 0.1, (from - to).Magnitude)
+    beamPart.CFrame = CFrame.lookAt((from + to) / 2, to)
+    beamPart.Parent = Workspace
+    
+    -- Tự hủy sau 0.15s
+    game:GetService("Debris"):AddItem(beamPart, 0.15)
+end
+
+local function FireWallbang(targetPart)
+    local now = tick()
+    if now - lastWallbangTime < CONFIG.WallbangCooldown then return end
+    lastWallbangTime = now
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    -- Lấy vị trí bắn: ưu tiên Head của mình, nếu không có thì dùng Camera
+    local originPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    local origin = originPart and originPart.Position or Camera.CFrame.Position
+    local targetPos = targetPart.Position
+    
+    -- Raycast xuyên tường: dùng RaycastParams lọc bỏ tường
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    local excludeList = {}
+    
+    -- Bỏ qua tất cả part của chính mình
+    if CONFIG.IgnoreLocalParts and character then
+        for _, v in pairs(character:GetDescendants()) do
+            if v:IsA("BasePart") then table.insert(excludeList, v) end
+        end
+    end
+    
+    -- Bỏ qua mục tiêu (để raycast không dừng ở mục tiêu trước khi xuyên tường)
+    -- Thực chất ta muốn raycast XUYÊN qua mọi thứ để đến mục tiêu,
+    -- nên ta sẽ dùng Raycast trực tiếp đến vị trí mục tiêu, bỏ qua tường.
+    raycastParams.FilterDescendantsInstances = excludeList
+    
+    -- Hướng bắn
+    local direction = (targetPos - origin)
+    local distance = direction.Magnitude
+    if distance > CONFIG.WallbangRange then return end
+    direction = direction.Unit * distance
+    
+    -- Raycast "xuyên thấu": ta không dùng Raycast để chặn, mà trực tiếp kiểm tra
+    -- xem có part nào của đối thủ nằm trên đường đạn không (dùng WorldToScreenPoint hoặc kiểm tra vị trí).
+    -- Đơn giản nhất: vì ta đã có targetPart, chỉ cần kiểm tra khoảng cách và gây damage.
+    
+    -- Tìm Humanoid của đối thủ từ targetPart
+    local targetCharacter = targetPart.Parent
+    local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+    
+    if targetHumanoid and targetHumanoid.Health > 0 then
+        -- Vẽ beam xuyên tường
+        CreateBeam(origin, targetPos)
+        
+        -- Gây sát thương (client-side, chỉ hoạt động nếu game cho phép)
+        -- Cách 1: Gọi trực tiếp (chỉ có tác dụng nếu game không có anti-cheat server-side)
+        pcall(function()
+            targetHumanoid:TakeDamage(CONFIG.WallbangDamage)
+        end)
+        
+        -- Cách 2: Nếu game có RemoteEvent damage, bạn cần tìm và fire nó.
+        -- Ví dụ (không chắc chắn hoạt động với mọi game):
+        -- local damageRemote = game:GetService("ReplicatedStorage"):FindFirstChild("DamageEvent")
+        -- if damageRemote then damageRemote:FireServer(targetHumanoid, CONFIG.WallbangDamage) end
+        
+        -- Cách 3: Nếu game dùng tool/súng, ta có thể fire tool.
+        -- Nhưng cách này phức tạp và phụ thuộc game cụ thể.
+    end
+end
+
+-- Lắng nghe chuột trái để bắn wallbang
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and isWallbang and isAiming then
+        if currentTarget then
+            FireWallbang(currentTarget)
+        end
+    end
+end)
+
+-- ==========================================
+-- 4. RESET KHI HỒI SINH
+-- ==========================================
+LocalPlayer.CharacterAdded:Connect(function()
+    currentTarget = nil
+    isAiming = false
+    isWallbang = false
+    ToggleBtn.Text = "Aimbot: OFF"
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    WallbangBtn.Text = "Wallbang: OFF"
+    WallbangBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+end)
+
+print("✅ Script Aim + Camera Follow + Wallbang v2.0 đã load!")
