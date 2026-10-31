@@ -1,90 +1,93 @@
 --[[
-    BRING PLAYER HUB — Chỉ chức năng gom người chơi
-    Tác giả: MrDon
-    Chức năng:
-      - Gom tất cả người chơi khác về trước mặt bạn
-      - Đóng băng họ tại chỗ (Anchored)
-      - Xếp thành hàng ngang, không chồng lên nhau
-      - Tự động thả khi tắt hoặc khi respawn
+    FREEZE ALL PLAYERS HUB
+    Chức năng duy nhất: Đóng băng toàn bộ người chơi trong server
+    
+    Những gì LÀM ĐƯỢC:
+      - Kéo tất cả người chơi về một chỗ
+      - Đóng băng vị trí (Anchored) — nếu server cho phép
+      - Hiệu ứng băng giá (highlight + particle)
+      - Tự động thả khi tắt / respawn
+    
+    Những gì KHÔNG THỂ (giới hạn Roblox):
+      - Freeze camera người khác (camera là local)
+      - Disable input người khác (PlayerModule là local)
+      - Freeze màn hình người khác
 ]]
 
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
+local Debris           = game:GetService("Debris")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
 --// ================== CẤU HÌNH ==================
 local CONFIG = {
-    Distance        = 6,      -- khoảng cách trước mặt (studs)
-    Spacing         = 4,      -- khoảng cách giữa các người chơi
-    MaxPlayers      = 9,      -- giới hạn số người bị gom (tránh lag)
-    RefreshRate     = 0,      -- 0 = mỗi Heartbeat
-    ReleaseOnRespawn = true,  -- tự thả khi bạn respawn
+    Distance     = 8,        -- khoảng cách trước mặt
+    Spacing      = 5,        -- khoảng cách giữa các người chơi
+    MaxPlayers   = 50,       -- giới hạn (server thường < 30)
+    ShowEffect   = true,     -- hiệu ứng băng giá
 }
 
 --// ================== MÀU SẮC ==================
+local ICE_BLUE   = Color3.fromRGB(120, 200, 255)
+local ICE_LIGHT  = Color3.fromRGB(200, 235, 255)
+local ICE_DARK   = Color3.fromRGB(60, 130, 200)
+local BACKGROUND = Color3.fromRGB(10, 18, 28)
+local BUTTON     = Color3.fromRGB(25, 38, 55)
+local TEXT       = Color3.fromRGB(230, 240, 250)
 local RED        = Color3.fromRGB(220, 40, 55)
-local LIGHT_RED  = Color3.fromRGB(255, 130, 140)
-local DARK_RED   = Color3.fromRGB(150, 25, 40)
-local BACKGROUND = Color3.fromRGB(15, 15, 22)
-local BUTTON     = Color3.fromRGB(30, 30, 42)
-local TEXT       = Color3.fromRGB(240, 240, 245)
 
 --// ================== STATE ==================
-local BringEnabled    = false
-local AnchoredChars   = {}   -- [Character] = true
-local Connection      = nil
+local FreezeEnabled = false
+local AnchoredChars = {}    -- [Character] = {highlight, particle}
+local Connection    = nil
 
 --// ================== GUI ==================
 local parent = (gethui and gethui()) or PlayerGui
-local old = parent:FindFirstChild("BringPlayerHub")
+local old = parent:FindFirstChild("FreezeAllHub")
 if old then old:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BringPlayerHub"
+ScreenGui.Name = "FreezeAllHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = parent
 
---// NÚT MỞ MENU
+--// NÚT MỞ
 local MenuButton = Instance.new("TextButton")
-MenuButton.Name = "MenuButton"
 MenuButton.Parent = ScreenGui
 MenuButton.Size = UDim2.new(0, 45, 0, 45)
 MenuButton.Position = UDim2.new(0, 15, 0.5, -22)
 MenuButton.BackgroundColor3 = BACKGROUND
 MenuButton.BackgroundTransparency = 0.1
-MenuButton.Text = "B"
-MenuButton.TextColor3 = LIGHT_RED
-MenuButton.TextSize = 22
+MenuButton.Text = "❄"
+MenuButton.TextColor3 = ICE_LIGHT
+MenuButton.TextSize = 24
 MenuButton.Font = Enum.Font.GothamBold
 MenuButton.AutoButtonColor = false
 MenuButton.ZIndex = 10
-
 local mc = Instance.new("UICorner", MenuButton)
 mc.CornerRadius = UDim.new(0, 10)
 local ms = Instance.new("UIStroke", MenuButton)
-ms.Color = RED
+ms.Color = ICE_BLUE
 ms.Thickness = 2
 
---// FRAME CHÍNH
+--// FRAME
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 240, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -90)
+MainFrame.Size = UDim2.new(0, 260, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -110)
 MainFrame.BackgroundColor3 = BACKGROUND
-MainFrame.BackgroundTransparency = 0.25
+MainFrame.BackgroundTransparency = 0.2
 MainFrame.BorderSizePixel = 0
 MainFrame.ZIndex = 9
-
 local mfc = Instance.new("UICorner", MainFrame)
 mfc.CornerRadius = UDim.new(0, 10)
 local mfs = Instance.new("UIStroke", MainFrame)
-mfs.Color = RED
+mfs.Color = ICE_BLUE
 mfs.Thickness = 1.5
 
 --// TITLE
@@ -93,19 +96,19 @@ Title.Parent = MainFrame
 Title.Size = UDim2.new(1, -20, 0, 30)
 Title.Position = UDim2.new(0, 10, 0, 8)
 Title.BackgroundTransparency = 1
-Title.Text = "BRING PLAYER HUB"
-Title.TextColor3 = LIGHT_RED
-Title.TextSize = 15
+Title.Text = "❄ FREEZE ALL ❄"
+Title.TextColor3 = ICE_LIGHT
+Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 10
 
---// NÚT ĐÓNG
+--// CLOSE
 local CloseButton = Instance.new("TextButton")
 CloseButton.Parent = MainFrame
 CloseButton.Size = UDim2.new(0, 26, 0, 26)
 CloseButton.Position = UDim2.new(1, -34, 0, 8)
-CloseButton.BackgroundColor3 = DARK_RED
+CloseButton.BackgroundColor3 = ICE_DARK
 CloseButton.Text = "X"
 CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseButton.TextSize = 13
@@ -115,28 +118,28 @@ CloseButton.ZIndex = 10
 local cbc = Instance.new("UICorner", CloseButton)
 cbc.CornerRadius = UDim.new(0, 7)
 
---// NÚT TOGGLE BRING
-local BringButton = Instance.new("TextButton")
-BringButton.Parent = MainFrame
-BringButton.Size = UDim2.new(1, -20, 0, 36)
-BringButton.Position = UDim2.new(0, 10, 0, 50)
-BringButton.BackgroundColor3 = BUTTON
-BringButton.Text = "Bring Player : OFF"
-BringButton.TextColor3 = TEXT
-BringButton.TextSize = 13
-BringButton.Font = Enum.Font.GothamBold
-BringButton.AutoButtonColor = false
-BringButton.ZIndex = 10
-local bbc = Instance.new("UICorner", BringButton)
-bbc.CornerRadius = UDim.new(0, 7)
+--// NÚT FREEZE
+local FreezeButton = Instance.new("TextButton")
+FreezeButton.Parent = MainFrame
+FreezeButton.Size = UDim2.new(1, -20, 0, 40)
+FreezeButton.Position = UDim2.new(0, 10, 0, 50)
+FreezeButton.BackgroundColor3 = BUTTON
+FreezeButton.Text = "Freeze All Players : OFF"
+FreezeButton.TextColor3 = TEXT
+FreezeButton.TextSize = 13
+FreezeButton.Font = Enum.Font.GothamBold
+FreezeButton.AutoButtonColor = false
+FreezeButton.ZIndex = 10
+local fbc = Instance.new("UICorner", FreezeButton)
+fbc.CornerRadius = UDim.new(0, 7)
 
---// NÚT THẢ TẤT CẢ
+--// NÚT THẢ
 local ReleaseButton = Instance.new("TextButton")
 ReleaseButton.Parent = MainFrame
-ReleaseButton.Size = UDim2.new(1, -20, 0, 30)
-ReleaseButton.Position = UDim2.new(0, 10, 0, 94)
+ReleaseButton.Size = UDim2.new(1, -20, 0, 32)
+ReleaseButton.Position = UDim2.new(0, 10, 0, 98)
 ReleaseButton.BackgroundColor3 = BUTTON
-ReleaseButton.Text = "Release All (Thả tất cả)"
+ReleaseButton.Text = "Unfreeze All (Thả tất cả)"
 ReleaseButton.TextColor3 = TEXT
 ReleaseButton.TextSize = 12
 ReleaseButton.Font = Enum.Font.GothamBold
@@ -145,18 +148,19 @@ ReleaseButton.ZIndex = 10
 local rbc = Instance.new("UICorner", ReleaseButton)
 rbc.CornerRadius = UDim.new(0, 7)
 
---// LABEL TRẠNG THÁI
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = MainFrame
-StatusLabel.Size = UDim2.new(1, -20, 0, 24)
-StatusLabel.Position = UDim2.new(0, 10, 0, 130)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Status: Idle"
-StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
-StatusLabel.TextSize = 11
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.ZIndex = 10
+--// INFO
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Parent = MainFrame
+InfoLabel.Size = UDim2.new(1, -20, 0, 70)
+InfoLabel.Position = UDim2.new(0, 10, 0, 138)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "Status: Idle\n\n⚠ Camera/Input của người khác\nkhông thể freeze từ client."
+InfoLabel.TextColor3 = Color3.fromRGB(160, 180, 200)
+InfoLabel.TextSize = 11
+InfoLabel.Font = Enum.Font.Gotham
+InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+InfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+InfoLabel.ZIndex = 10
 
 --// ================== HÀM HỖ TRỢ ==================
 local function GetMyChar()
@@ -167,6 +171,60 @@ local function GetMyChar()
     if not hum or not hrp then return nil end
     if hum.Health <= 0 then return nil end
     return char, hum, hrp
+end
+
+local function AddIceEffect(char)
+    if not CONFIG.ShowEffect then return end
+    pcall(function()
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        if hrp:FindFirstChild("FreezeHighlight") then return end
+
+        -- Highlight
+        local hl = Instance.new("Highlight")
+        hl.Name = "FreezeHighlight"
+        hl.FillColor = ICE_BLUE
+        hl.OutlineColor = ICE_LIGHT
+        hl.FillTransparency = 0.5
+        hl.OutlineTransparency = 0.2
+        hl.Parent = char
+
+        -- Particle
+        local attach = Instance.new("Attachment")
+        attach.Name = "FreezeAttach"
+        attach.Parent = hrp
+
+        local pe = Instance.new("ParticleEmitter")
+        pe.Name = "FreezeParticle"
+        pe.Color = ColorSequence.new(ICE_LIGHT, ICE_BLUE)
+        pe.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.3),
+            NumberSequenceKeypoint.new(1, 0)
+        })
+        pe.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        pe.Lifetime = NumberRange.new(0.8, 1.4)
+        pe.Rate = 15
+        pe.Speed = NumberRange.new(1, 3)
+        pe.SpreadAngle = Vector2.new(360, 360)
+        pe.Parent = attach
+
+        AnchoredChars[char] = {highlight = hl, attach = attach}
+    end)
+end
+
+local function RemoveIceEffect(char)
+    pcall(function()
+        local data = AnchoredChars[char]
+        if data then
+            if data.highlight then data.highlight:Destroy() end
+            if data.attach then data.attach:Destroy() end
+        end
+        local hl = char:FindFirstChild("FreezeHighlight")
+        if hl then hl:Destroy() end
+    end)
 end
 
 local function ReleaseAll()
@@ -181,6 +239,7 @@ local function ReleaseAll()
                     hum.PlatformStand = false
                     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
                 end
+                RemoveIceEffect(char)
                 count += 1
             end
         end)
@@ -189,27 +248,12 @@ local function ReleaseAll()
     return count
 end
 
-local function UpdateStatus()
-    local count = 0
-    for char, _ in pairs(AnchoredChars) do
-        if char and char.Parent then count += 1 end
-    end
-    if BringEnabled then
-        StatusLabel.Text = string.format("Status: Đang gom %d người", count)
-        StatusLabel.TextColor3 = Color3.fromRGB(120, 255, 140)
-    else
-        StatusLabel.Text = "Status: Idle"
-        StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
-    end
-end
-
---// ================== LOGIC CHÍNH ==================
-local function BringLoop()
+--// ================== LOGIC ==================
+local function FreezeLoop()
     local char, hum, hrp = GetMyChar()
     if not char then return end
     if hum.Health <= 0 then return end
 
-    -- Gốc: vị trí hiện tại + hướng nhìn
     local originCF = hrp.CFrame
     local forward  = originCF.LookVector
     local right    = originCF.RightVector
@@ -221,24 +265,24 @@ local function BringLoop()
             local eHum = plr.Character:FindFirstChildOfClass("Humanoid")
 
             if eHrp and eHum and eHum.Health > 0 then
-                -- Xếp thành 3 cột ngang, 3 hàng dọc
-                local col = index % 3
-                local row = math.floor(index / 3)
-                local offsetX = (col - 1) * CONFIG.Spacing
+                -- Xếp thành lưới 5 cột
+                local col = index % 5
+                local row = math.floor(index / 5)
+                local offsetX = (col - 2) * CONFIG.Spacing
                 local offsetZ = -CONFIG.Distance - row * CONFIG.Spacing
 
                 local targetCF = originCF + forward * offsetZ + right * offsetX
 
-                -- Anchor 1 lần, sau đó chỉ cập nhật CFrame
                 if not eHrp.Anchored then
                     eHrp.Anchored = true
                 end
                 eHrp.CFrame = targetCF
-
-                -- Ngăn ragdoll / physics đẩy
                 eHum.PlatformStand = true
 
-                AnchoredChars[plr.Character] = true
+                if not AnchoredChars[plr.Character] then
+                    AddIceEffect(plr.Character)
+                end
+                AnchoredChars[plr.Character] = AnchoredChars[plr.Character] or {}
 
                 index += 1
                 if index >= CONFIG.MaxPlayers then break end
@@ -247,43 +291,43 @@ local function BringLoop()
     end
 end
 
---// ================== CONNECT / DISCONNECT ==================
-local function StartBring()
+local function StartFreeze()
     if Connection then return end
     Connection = RunService.Heartbeat:Connect(function()
-        if BringEnabled then
-            pcall(BringLoop)
-            UpdateStatus()
+        if FreezeEnabled then
+            pcall(FreezeLoop)
         end
     end)
 end
 
-local function StopBring()
+local function StopFreeze()
     if Connection then
         Connection:Disconnect()
         Connection = nil
     end
 end
 
---// ================== SỰ KIỆN NÚT ==================
-BringButton.MouseButton1Click:Connect(function()
-    BringEnabled = not BringEnabled
-    if BringEnabled then
-        BringButton.Text = "Bring Player : ON"
-        BringButton.BackgroundColor3 = RED
-        StartBring()
+--// ================== SỰ KIỆN ==================
+FreezeButton.MouseButton1Click:Connect(function()
+    FreezeEnabled = not FreezeEnabled
+    if FreezeEnabled then
+        FreezeButton.Text = "Freeze All Players : ON"
+        FreezeButton.BackgroundColor3 = ICE_DARK
+        StartFreeze()
     else
-        BringButton.Text = "Bring Player : OFF"
-        BringButton.BackgroundColor3 = BUTTON
-        StopBring()
+        FreezeButton.Text = "Freeze All Players : OFF"
+        FreezeButton.BackgroundColor3 = BUTTON
+        StopFreeze()
         ReleaseAll()
     end
-    UpdateStatus()
 end)
 
 ReleaseButton.MouseButton1Click:Connect(function()
     ReleaseAll()
-    UpdateStatus()
+    FreezeEnabled = false
+    FreezeButton.Text = "Freeze All Players : OFF"
+    FreezeButton.BackgroundColor3 = BUTTON
+    StopFreeze()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
@@ -296,7 +340,7 @@ MenuButton.MouseButton1Click:Connect(function()
     MenuButton.Visible = false
 end)
 
---// KÉO THẢ MENU
+--// KÉO THẢ
 local dragging, dragStart, startPos = false, nil, nil
 Title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -322,31 +366,27 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
---// TỰ ĐỘNG THẢ KHI RESPAWN
-if CONFIG.ReleaseOnRespawn then
-    LocalPlayer.CharacterAdded:Connect(function()
-        if BringEnabled then
-            BringEnabled = false
-            BringButton.Text = "Bring Player : OFF"
-            BringButton.BackgroundColor3 = BUTTON
-            StopBring()
-        end
-        ReleaseAll()
-        UpdateStatus()
-    end)
-end
+--// TỰ ĐỘNG RESET KHI RESPAWN
+LocalPlayer.CharacterAdded:Connect(function()
+    if FreezeEnabled then
+        FreezeEnabled = false
+        FreezeButton.Text = "Freeze All Players : OFF"
+        FreezeButton.BackgroundColor3 = BUTTON
+        StopFreeze()
+    end
+    ReleaseAll()
+end)
 
---// TỰ ĐỘNG RESET KHI NGƯỜI CHƠI KHÁC RESPAWN
 Players.PlayerAdded:Connect(function(plr)
     plr.CharacterAdded:Connect(function(newChar)
         if AnchoredChars[newChar] then
             local hrp = newChar:WaitForChild("HumanoidRootPart", 5)
             if hrp then hrp.Anchored = false end
+            RemoveIceEffect(newChar)
             AnchoredChars[newChar] = nil
         end
     end)
 end)
 
 --// KHỞI TẠO
-UpdateStatus()
-print("[Bring Player Hub] Loaded — chỉ chức năng gom người chơi.")
+print("[Freeze All Hub] Loaded — chức năng freeze toàn server.")
