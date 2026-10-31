@@ -14,7 +14,7 @@ local Camera = Workspace.CurrentCamera
 -- Cấu hình
 local CONFIG = {
     AimPart = "Head",
-    FOV = 200,
+    FOV = 2000,
     Smoothness = 0.15,
     CameraOffsetY = 2.5,
     LockCamera = true,
