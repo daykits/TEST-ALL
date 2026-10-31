@@ -1,7 +1,6 @@
 -- ==========================================
 -- Script: Aim Head + Camera Follow + Wallbang
--- Menu LUÔN HIỂN THỊ ĐÈ LÊN MENU ESC CỦA ROBLOX
--- Version: 2.2
+-- Version: 3.0 (Luôn bật, không reset khi chết)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -26,23 +25,34 @@ local CONFIG = {
     IgnoreLocalParts = true,
 }
 
--- Biến trạng thái
-local isAiming = false
-local isWallbang = false
+-- ==========================================
+-- TRẠNG THÁI MẶC ĐỊNH: LUÔN BẬT
+-- ==========================================
+local isAiming = true       -- ⬅️ LUÔN BẬT
+local isWallbang = true     -- ⬅️ LUÔN BẬT
 local currentTarget = nil
 local lastWallbangTime = 0
 
 -- ==========================================
--- 1. TẠO MENU — LUÔN HIỂN THỊ, ĐÈ LÊN CORE GUI
+-- 1. TẠO MENU (ƯU TIÊN COREGUI)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AimMenuGui"
+ScreenGui.Name = "AimMenuGui_" .. tostring(math.random(1000, 9999)) -- Random tên để tránh trùng
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true          -- Bỏ qua viền trên cùng
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.DisplayOrder = 999999          -- ⬅️ RẤT CAO để đè lên CoreGui
+ScreenGui.DisplayOrder = 999999
 ScreenGui.Enabled = true
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Cố gắng gán vào CoreGui (chỉ hoạt động với Executor)
+local successCore = pcall(function()
+    ScreenGui.Parent = game:GetService("CoreGui")
+end)
+
+if not successCore then
+    -- Fallback về PlayerGui nếu chạy trong Studio
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
@@ -53,7 +63,7 @@ MainFrame.BackgroundTransparency = 0.15
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Visible = true                 -- ⬅️ LUÔN HIỆN
+MainFrame.Visible = true
 MainFrame.ZIndex = 10
 MainFrame.Parent = ScreenGui
 
@@ -64,21 +74,21 @@ UICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ AIM + WALLBANG"
+Title.Text = "⚡ AIM + WALLBANG (ALWAYS ON)"
 Title.TextColor3 = Color3.fromRGB(0, 255, 200)
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.ZIndex = 11
 Title.Parent = MainFrame
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 28)
 ToggleBtn.Position = UDim2.new(0, 10, 0, 32)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50) -- Màu xanh lá vì đang bật
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.SourceSans
 ToggleBtn.TextSize = 14
-ToggleBtn.Text = "Aimbot: OFF"
+ToggleBtn.Text = "Aimbot: ON"
 ToggleBtn.ZIndex = 11
 ToggleBtn.Parent = MainFrame
 
@@ -96,15 +106,15 @@ PartBtn.Parent = MainFrame
 local WallbangBtn = Instance.new("TextButton")
 WallbangBtn.Size = UDim2.new(1, -20, 0, 28)
 WallbangBtn.Position = UDim2.new(0, 10, 0, 96)
-WallbangBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+WallbangBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 0) -- Màu cam vì đang bật
 WallbangBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallbangBtn.Font = Enum.Font.SourceSans
 WallbangBtn.TextSize = 14
-WallbangBtn.Text = "Wallbang: OFF"
+WallbangBtn.Text = "Wallbang: ON"
 WallbangBtn.ZIndex = 11
 WallbangBtn.Parent = MainFrame
 
--- Nút ẩn menu thủ công (nếu muốn giấu đi)
+-- Nút ẩn menu
 local HideBtn = Instance.new("TextButton")
 HideBtn.Size = UDim2.new(0, 24, 0, 24)
 HideBtn.Position = UDim2.new(1, -28, 0, 4)
@@ -116,7 +126,7 @@ HideBtn.Text = "X"
 HideBtn.ZIndex = 12
 HideBtn.Parent = MainFrame
 
--- Nút nhỏ để mở lại menu khi đã ẩn
+-- Nút mở lại menu
 local ShowBtn = Instance.new("TextButton")
 ShowBtn.Size = UDim2.new(0, 40, 0, 40)
 ShowBtn.Position = UDim2.new(0, 20, 0.5, -80)
@@ -134,22 +144,25 @@ local function SetMenuVisible(state)
     ShowBtn.Visible = not state
 end
 
-HideBtn.MouseButton1Click:Connect(function()
-    SetMenuVisible(false)
-end)
-
-ShowBtn.MouseButton1Click:Connect(function()
-    SetMenuVisible(true)
-end)
+HideBtn.MouseButton1Click:Connect(function() SetMenuVisible(false) end)
+ShowBtn.MouseButton1Click:Connect(function() SetMenuVisible(true) end)
 
 -- ==========================================
--- 2. LOGIC MENU
+-- 2. LOGIC MENU (Bấm chuột hoặc Phím tắt)
 -- ==========================================
-ToggleBtn.MouseButton1Click:Connect(function()
-    isAiming = not isAiming
+local function UpdateAimbotUI()
     ToggleBtn.Text = "Aimbot: " .. (isAiming and "ON" or "OFF")
     ToggleBtn.BackgroundColor3 = isAiming and Color3.fromRGB(0, 150, 50) or Color3.fromRGB(50, 50, 50)
-    if not isAiming then currentTarget = nil end
+end
+
+local function UpdateWallbangUI()
+    WallbangBtn.Text = "Wallbang: " .. (isWallbang and "ON" or "OFF")
+    WallbangBtn.BackgroundColor3 = isWallbang and Color3.fromRGB(150, 80, 0) or Color3.fromRGB(50, 50, 50)
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    isAiming = not isAiming
+    UpdateAimbotUI()
 end)
 
 PartBtn.MouseButton1Click:Connect(function()
@@ -159,8 +172,22 @@ end)
 
 WallbangBtn.MouseButton1Click:Connect(function()
     isWallbang = not isWallbang
-    WallbangBtn.Text = "Wallbang: " .. (isWallbang and "ON" or "OFF")
-    WallbangBtn.BackgroundColor3 = isWallbang and Color3.fromRGB(150, 80, 0) or Color3.fromRGB(50, 50, 50)
+    UpdateWallbangUI()
+end)
+
+-- Phím tắt dự phòng (1 = Aimbot, 2 = Target, 3 = Wallbang)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.One then
+        isAiming = not isAiming
+        UpdateAimbotUI()
+    elseif input.KeyCode == Enum.KeyCode.Two then
+        CONFIG.AimPart = (CONFIG.AimPart == "Head") and "Torso" or "Head"
+        PartBtn.Text = "Target: " .. CONFIG.AimPart
+    elseif input.KeyCode == Enum.KeyCode.Three then
+        isWallbang = not isWallbang
+        UpdateWallbangUI()
+    end
 end)
 
 -- ==========================================
@@ -292,17 +319,16 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- 5. RESET KHI HỒI SINH
+-- 5. RESET KHI HỒI SINH (CHỈ RESET CAMERA)
 -- ==========================================
 LocalPlayer.CharacterAdded:Connect(function()
+    -- KHÔNG TẮT Aimbot và Wallbang. Chỉ reset mục tiêu và camera.
     currentTarget = nil
-    isAiming = false
-    isWallbang = false
-    ToggleBtn.Text = "Aimbot: OFF"
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    WallbangBtn.Text = "Wallbang: OFF"
-    WallbangBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    -- Cập nhật lại UI đề phòng trường hợp UI bị mất khi respawn
+    UpdateAimbotUI()
+    UpdateWallbangUI()
 end)
 
-print("✅ Script v2.2 đã load! Menu luôn hiển thị đè lên menu ESC của Roblox.")
+print("✅ Script v3.0 đã load! Aimbot & Wallbang LUÔN BẬT.")
