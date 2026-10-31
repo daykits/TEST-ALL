@@ -1,6 +1,6 @@
 -- ==========================================
--- Script: Aim Head + Camera Follow + Wallbang
--- Version: 3.0 (Luôn bật, không reset khi chết)
+-- Script: Aim Head + Camera Follow + Wallbang + TPP
+-- Version: 4.0
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -23,13 +23,18 @@ local CONFIG = {
     WallbangDamage = 100,
     WallbangCooldown = 0.1,
     IgnoreLocalParts = true,
+    
+    -- Cấu hình Góc nhìn thứ 3 (TPP)
+    IsThirdPerson = false,      -- Mặc định là góc nhìn thứ 1 (FPP)
+    ThirdPersonDistance = 8,    -- Khoảng cách camera ra sau lưng nhân vật (TPP)
+    ThirdPersonOffsetY = 1.5,   -- Độ cao camera so với đầu (TPP)
 }
 
 -- ==========================================
 -- TRẠNG THÁI MẶC ĐỊNH: LUÔN BẬT
 -- ==========================================
-local isAiming = true       -- ⬅️ LUÔN BẬT
-local isWallbang = true     -- ⬅️ LUÔN BẬT
+local isAiming = true
+local isWallbang = true
 local currentTarget = nil
 local lastWallbangTime = 0
 
@@ -37,27 +42,25 @@ local lastWallbangTime = 0
 -- 1. TẠO MENU (ƯU TIÊN COREGUI)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AimMenuGui_" .. tostring(math.random(1000, 9999)) -- Random tên để tránh trùng
+ScreenGui.Name = "AimMenuGui_" .. tostring(math.random(1000, 9999))
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999999
 ScreenGui.Enabled = true
 
--- Cố gắng gán vào CoreGui (chỉ hoạt động với Executor)
 local successCore = pcall(function()
     ScreenGui.Parent = game:GetService("CoreGui")
 end)
-
 if not successCore then
-    -- Fallback về PlayerGui nếu chạy trong Studio
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 200, 0, 160)
-MainFrame.Position = UDim2.new(0, 20, 0.5, -80)
+-- Tăng chiều cao lên 200 để chứa thêm nút Góc nhìn
+MainFrame.Size = UDim2.new(0, 200, 0, 200)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -100)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BackgroundTransparency = 0.15
 MainFrame.BorderSizePixel = 0
@@ -74,7 +77,7 @@ UICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ AIM + WALLBANG (ALWAYS ON)"
+Title.Text = "⚡ AIM + WALLBANG + TPP"
 Title.TextColor3 = Color3.fromRGB(0, 255, 200)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -84,7 +87,7 @@ Title.Parent = MainFrame
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 28)
 ToggleBtn.Position = UDim2.new(0, 10, 0, 32)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50) -- Màu xanh lá vì đang bật
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.SourceSans
 ToggleBtn.TextSize = 14
@@ -106,13 +109,25 @@ PartBtn.Parent = MainFrame
 local WallbangBtn = Instance.new("TextButton")
 WallbangBtn.Size = UDim2.new(1, -20, 0, 28)
 WallbangBtn.Position = UDim2.new(0, 10, 0, 96)
-WallbangBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 0) -- Màu cam vì đang bật
+WallbangBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 0)
 WallbangBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallbangBtn.Font = Enum.Font.SourceSans
 WallbangBtn.TextSize = 14
 WallbangBtn.Text = "Wallbang: ON"
 WallbangBtn.ZIndex = 11
 WallbangBtn.Parent = MainFrame
+
+-- Nút chuyển đổi Góc nhìn (TPP/FPP)
+local CameraBtn = Instance.new("TextButton")
+CameraBtn.Size = UDim2.new(1, -20, 0, 28)
+CameraBtn.Position = UDim2.new(0, 10, 0, 128)
+CameraBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CameraBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CameraBtn.Font = Enum.Font.SourceSans
+CameraBtn.TextSize = 14
+CameraBtn.Text = "Góc nhìn: Thứ 1 (FPP)"
+CameraBtn.ZIndex = 11
+CameraBtn.Parent = MainFrame
 
 -- Nút ẩn menu
 local HideBtn = Instance.new("TextButton")
@@ -126,10 +141,9 @@ HideBtn.Text = "X"
 HideBtn.ZIndex = 12
 HideBtn.Parent = MainFrame
 
--- Nút mở lại menu
 local ShowBtn = Instance.new("TextButton")
 ShowBtn.Size = UDim2.new(0, 40, 0, 40)
-ShowBtn.Position = UDim2.new(0, 20, 0.5, -80)
+ShowBtn.Position = UDim2.new(0, 20, 0.5, -100)
 ShowBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 150)
 ShowBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ShowBtn.Font = Enum.Font.SourceSansBold
@@ -148,7 +162,7 @@ HideBtn.MouseButton1Click:Connect(function() SetMenuVisible(false) end)
 ShowBtn.MouseButton1Click:Connect(function() SetMenuVisible(true) end)
 
 -- ==========================================
--- 2. LOGIC MENU (Bấm chuột hoặc Phím tắt)
+-- 2. LOGIC MENU & PHÍM TẮT
 -- ==========================================
 local function UpdateAimbotUI()
     ToggleBtn.Text = "Aimbot: " .. (isAiming and "ON" or "OFF")
@@ -158,6 +172,18 @@ end
 local function UpdateWallbangUI()
     WallbangBtn.Text = "Wallbang: " .. (isWallbang and "ON" or "OFF")
     WallbangBtn.BackgroundColor3 = isWallbang and Color3.fromRGB(150, 80, 0) or Color3.fromRGB(50, 50, 50)
+end
+
+local function UpdateCameraUI()
+    if CONFIG.IsThirdPerson then
+        CameraBtn.Text = "Góc nhìn: Thứ 3 (TPP)"
+        CameraBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200) -- Màu xanh dương
+        Camera.CameraType = Enum.CameraType.Scriptable
+    else
+        CameraBtn.Text = "Góc nhìn: Thứ 1 (FPP)"
+        CameraBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Camera.CameraType = Enum.CameraType.Custom -- Trả lại quyền điều khiển cho game (FPP)
+    end
 end
 
 ToggleBtn.MouseButton1Click:Connect(function()
@@ -175,7 +201,12 @@ WallbangBtn.MouseButton1Click:Connect(function()
     UpdateWallbangUI()
 end)
 
--- Phím tắt dự phòng (1 = Aimbot, 2 = Target, 3 = Wallbang)
+CameraBtn.MouseButton1Click:Connect(function()
+    CONFIG.IsThirdPerson = not CONFIG.IsThirdPerson
+    UpdateCameraUI()
+end)
+
+-- Phím tắt (1 = Aimbot, 2 = Target, 3 = Wallbang, V = Đổi Góc nhìn)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.One then
@@ -187,11 +218,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     elseif input.KeyCode == Enum.KeyCode.Three then
         isWallbang = not isWallbang
         UpdateWallbangUI()
+    elseif input.KeyCode == Enum.KeyCode.V then
+        CONFIG.IsThirdPerson = not CONFIG.IsThirdPerson
+        UpdateCameraUI()
     end
 end)
 
 -- ==========================================
--- 3. AIMBOT + CAMERA FOLLOW
+-- 3. AIMBOT + CAMERA FOLLOW (FPP/TPP)
 -- ==========================================
 local function GetClosestTarget()
     local closestTarget = nil
@@ -243,23 +277,38 @@ RunService.RenderStepped:Connect(function()
     
     if currentTarget then
         local targetPos = currentTarget.Position
-        local cameraPos = Camera.CFrame.Position
-        local lookAtCFrame = CFrame.new(cameraPos, targetPos)
+        local character = LocalPlayer.Character
         
-        if CONFIG.Smoothness > 0 then
-            Camera.CFrame = Camera.CFrame:Lerp(lookAtCFrame, 1 - CONFIG.Smoothness)
-        else
-            Camera.CFrame = lookAtCFrame
-        end
-        
-        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-            local character = LocalPlayer.Character
-            if character then
-                local head = character:FindFirstChild("Head")
-                if head then
-                    local newCameraPos = head.Position + Vector3.new(0, CONFIG.CameraOffsetY, 0)
+        if character then
+            local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+            if head then
+                -- Tính toán vị trí Camera
+                local cameraPos = Camera.CFrame.Position
+                
+                if CONFIG.IsThirdPerson then
+                    -- GÓC NHÌN THỨ 3 (TPP)
+                    -- Camera đặt phía sau đầu nhân vật
+                    local lookVector = (targetPos - head.Position).Unit
+                    local rightVector = lookVector:Cross(Vector3.new(0, 1, 0)).Unit
+                    local upVector = rightVector:Cross(lookVector).Unit
+                    
+                    -- Lùi camera ra sau
+                    local newCameraPos = head.Position - (lookVector * CONFIG.ThirdPersonDistance) + (upVector * CONFIG.ThirdPersonOffsetY)
                     local finalCFrame = CFrame.new(newCameraPos, targetPos)
+                    
                     Camera.CFrame = Camera.CFrame:Lerp(finalCFrame, 0.3)
+                else
+                    -- GÓC NHÌN THỨ 1 (FPP)
+                    if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+                        -- Bám theo đầu khi giữ chuột phải
+                        local newCameraPos = head.Position + Vector3.new(0, CONFIG.CameraOffsetY, 0)
+                        local finalCFrame = CFrame.new(newCameraPos, targetPos)
+                        Camera.CFrame = Camera.CFrame:Lerp(finalCFrame, 0.3)
+                    else
+                        -- Ngắm bình thường từ tâm màn hình
+                        local lookAtCFrame = CFrame.new(cameraPos, targetPos)
+                        Camera.CFrame = Camera.CFrame:Lerp(lookAtCFrame, 1 - CONFIG.Smoothness)
+                    end
                 end
             end
         end
@@ -319,16 +368,21 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- 5. RESET KHI HỒI SINH (CHỈ RESET CAMERA)
+-- 5. RESET KHI HỒI SINH
 -- ==========================================
 LocalPlayer.CharacterAdded:Connect(function()
-    -- KHÔNG TẮT Aimbot và Wallbang. Chỉ reset mục tiêu và camera.
     currentTarget = nil
     UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     
-    -- Cập nhật lại UI đề phòng trường hợp UI bị mất khi respawn
+    -- Cập nhật lại UI
     UpdateAimbotUI()
     UpdateWallbangUI()
+    UpdateCameraUI()
 end)
 
-print("✅ Script v3.0 đã load! Aimbot & Wallbang LUÔN BẬT.")
+-- Khởi tạo UI ban đầu
+UpdateAimbotUI()
+UpdateWallbangUI()
+UpdateCameraUI()
+
+print("✅ Script v4.0 đã load! Thêm phím [V] để đổi Góc nhìn 1/3.")
