@@ -1,1 +1,2947 @@
+-- ============================================================
+-- PRINCE HUB CORE
+-- ============================================================
+local Core = {}
 
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local TweenService     = game:GetService("TweenService")
+local UIS              = game:GetService("UserInputService")
+local RS               = game:GetService("ReplicatedStorage")
+local VIM              = game:GetService("VirtualInputManager")
+local VirtualUser      = game:GetService("VirtualUser")
+
+Core.lp            = Players.LocalPlayer
+Core.RS            = RS
+Core.UIS           = UIS
+Core.VIM           = VIM
+Core.TweenService  = TweenService
+Core.run_svc       = cloneref and cloneref(RunService) or RunService
+Core.players_svc   = cloneref and cloneref(Players) or Players
+Core.core_gui      = cloneref and cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")
+Core.camera        = workspace.CurrentCamera
+
+-- Shared teleport state
+Core.teleportSpeed  = 89
+Core.tpId           = 0
+Core.isTeleporting  = false
+Core.invisibleFloor = nil
+Core.activeTpConn   = nil
+Core.activeTask     = nil
+Core.DisableForwardKey = false
+
+-- Feature flags shared
+Core.walkspeedEnabled = false
+Core.walkspeedValue   = 45
+Core.noclipActive     = false
+Core.infiniteJumpEnabled = false
+Core.blockTakestam    = false
+Core.bypassBlock      = false
+Core.noStunEnabled    = false
+Core.autoAdsEnabled   = false
+Core.autoStatsEnabled = false
+
+-- Anti-AFK
+Core.lp.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+function Core.notify(title, content, dur)
+    local text = ("[%s] %s"):format(tostring(title), tostring(content))
+    if _G.BananaNotify then
+        pcall(_G.BananaNotify, text, dur or 4)
+    else
+        print(text)
+    end
+end
+
+function Core.getCharFolder()
+    local pc = workspace:FindFirstChild("PlayerCharacters")
+    return pc and pc:FindFirstChild(Core.lp.Name)
+end
+
+function Core.getLocalHRP()
+    local char = Core.lp.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+function Core.getLevel()
+    local ms = RS:FindFirstChild("Stats" .. Core.lp.Name)
+    local lv = ms and ms:FindFirstChild("Stats") and ms.Stats:FindFirstChild("Level")
+    return lv and lv.Value or 0
+end
+
+function Core.getQuest()
+    local ms = RS:FindFirstChild("Stats" .. Core.lp.Name)
+    local cq = ms and ms:FindFirstChild("Quest") and ms.Quest:FindFirstChild("CurrentQuest")
+    return cq and cq.Value or ""
+end
+
+-- ============================================================
+-- TELEPORT ENGINE
+-- ============================================================
+function Core.DoSafeTeleport(targetPos)
+    if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+    local char = Core.lp.Character
+    local rp   = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChild("Humanoid")
+    if not rp or not hum or hum.Health <= 0 then return end
+
+    local dist = (rp.Position - targetPos).Magnitude
+    if dist < 5 then
+        rp.CFrame = (rp.CFrame - rp.Position) + targetPos
+        return
+    end
+
+    if Core.activeTpConn then Core.activeTpConn:Disconnect(); Core.activeTpConn = nil end
+    if Core.invisibleFloor then Core.invisibleFloor:Destroy(); Core.invisibleFloor = nil end
+    for _, bvName in ipairs({"AF_BV", "S2_BV", "AH_BV", "KT_BV"}) do
+        local bv = rp:FindFirstChild(bvName)
+        if bv then bv:Destroy() end
+    end
+
+    Core.isTeleporting = true
+    Core.tpId = Core.tpId + 1
+    local currentTpId = Core.tpId
+    local speed = Core.teleportSpeed or 89
+    local reached = false
+
+    local waypoints = {}
+    if dist > 300 then
+        local safeAlt = math.max(rp.Position.Y, targetPos.Y) + 2500
+        table.insert(waypoints, Vector3.new(rp.Position.X, safeAlt, rp.Position.Z))
+        table.insert(waypoints, Vector3.new(targetPos.X, safeAlt, targetPos.Z))
+        if targetPos.Y < -500 then
+            table.insert(waypoints, Vector3.new(targetPos.X, (safeAlt + targetPos.Y) / 2, targetPos.Z))
+        end
+    end
+    table.insert(waypoints, targetPos)
+
+    local currentWp = 1
+
+    local floor = Instance.new("Part")
+    floor.Size = Vector3.new(10, 1, 10)
+    floor.Transparency = 1
+    floor.Anchored = true
+    floor.CanCollide = true
+    floor.Parent = workspace
+    Core.invisibleFloor = floor
+
+    if not Core.DisableForwardKey then
+        VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+    end
+
+    local conn
+    conn = Core.run_svc.Heartbeat:Connect(function(dt)
+        if not rp or not rp.Parent or hum.Health <= 0 or Core.tpId ~= currentTpId then
+            reached = true
+            if conn then conn:Disconnect() end
+            return
+        end
+        local wp = waypoints[currentWp]
+        local d = (rp.Position - wp).Magnitude
+        if d <= 20 then
+            rp.CFrame = (rp.CFrame - rp.Position) + wp
+            rp.AssemblyLinearVelocity = Vector3.zero
+            currentWp = currentWp + 1
+            if currentWp > #waypoints then
+                rp.CFrame = (rp.CFrame - rp.Position) + targetPos
+                rp.AssemblyLinearVelocity = Vector3.zero
+                reached = true
+                if Core.invisibleFloor then Core.invisibleFloor:Destroy(); Core.invisibleFloor = nil end
+                Core.isTeleporting = false
+                if conn then conn:Disconnect() end
+                return
+            end
+            wp = waypoints[currentWp]
+            d = (rp.Position - wp).Magnitude
+        end
+        local dir = (wp - rp.Position).Unit
+        local moveStep = math.min(speed * dt, d * 0.9)
+        rp.CFrame = (rp.CFrame - rp.Position) + (rp.Position + dir * moveStep)
+        rp.AssemblyLinearVelocity = Vector3.zero
+        if Core.invisibleFloor and Core.invisibleFloor.Parent then
+            Core.invisibleFloor.CFrame = rp.CFrame * CFrame.new(0, -3.1, 0)
+        end
+    end)
+    Core.activeTpConn = conn
+
+    while not reached and Core.tpId == currentTpId do
+        task.wait(0.1)
+    end
+
+    if Core.tpId == currentTpId then
+        VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+    end
+end
+
+function Core.DoArcTeleport(targetPos)
+    local H = Core
+    if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+    local char = H.lp.Character
+    local rp   = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChild("Humanoid")
+    if not rp or not hum or hum.Health <= 0 then return end
+
+    local dist = (rp.Position - targetPos).Magnitude
+    if dist < 5 then
+        rp.CFrame = (rp.CFrame - rp.Position) + targetPos
+        return
+    end
+
+    if H.activeTpConn then H.activeTpConn:Disconnect(); H.activeTpConn = nil end
+    if H.invisibleFloor then H.invisibleFloor:Destroy(); H.invisibleFloor = nil end
+    for _, bvName in ipairs({"AF_BV", "S2_BV", "AH_BV"}) do
+        local bv = rp:FindFirstChild(bvName)
+        if bv then bv:Destroy() end
+    end
+
+    H.isTeleporting = true
+    H.tpId = (H.tpId or 0) + 1
+    local currentTpId = H.tpId
+    local speed = H.teleportSpeed or 89
+    local reached = false
+
+    local safeAlt = math.max(rp.Position.Y, targetPos.Y) + 2500
+    local waypoints = {
+        Vector3.new(rp.Position.X, safeAlt, rp.Position.Z),
+        Vector3.new(targetPos.X, safeAlt, targetPos.Z),
+    }
+    if targetPos.Y < -500 then
+        table.insert(waypoints, Vector3.new(targetPos.X, (safeAlt + targetPos.Y) / 2, targetPos.Z))
+    end
+    table.insert(waypoints, targetPos)
+
+    local currentWp = 1
+    local floor = Instance.new("Part")
+    floor.Size = Vector3.new(10, 1, 10)
+    floor.Transparency = 1
+    floor.Anchored = true
+    floor.CanCollide = true
+    floor.Parent = workspace
+    H.invisibleFloor = floor
+
+    if not H.DisableForwardKey then
+        H.VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+    end
+
+    local conn
+    conn = H.run_svc.Heartbeat:Connect(function(dt)
+        if not rp or not rp.Parent or hum.Health <= 0 or H.tpId ~= currentTpId then
+            reached = true
+            if conn then conn:Disconnect() end
+            return
+        end
+        local wp = waypoints[currentWp]
+        local d = (rp.Position - wp).Magnitude
+        if d <= 20 then
+            rp.CFrame = (rp.CFrame - rp.Position) + wp
+            rp.AssemblyLinearVelocity = Vector3.zero
+            currentWp = currentWp + 1
+            if currentWp > #waypoints then
+                rp.CFrame = (rp.CFrame - rp.Position) + targetPos
+                rp.AssemblyLinearVelocity = Vector3.zero
+                reached = true
+                if H.invisibleFloor then H.invisibleFloor:Destroy(); H.invisibleFloor = nil end
+                H.isTeleporting = false
+                if conn then conn:Disconnect() end
+                return
+            end
+            wp = waypoints[currentWp]
+            d = (rp.Position - wp).Magnitude
+        end
+        local dir = (wp - rp.Position).Unit
+        local moveStep = math.min(speed * dt, d * 0.9)
+        rp.CFrame = (rp.CFrame - rp.Position) + (rp.Position + dir * moveStep)
+        rp.AssemblyLinearVelocity = Vector3.zero
+        if H.invisibleFloor and H.invisibleFloor.Parent then
+            H.invisibleFloor.CFrame = rp.CFrame * CFrame.new(0, -3.1, 0)
+        end
+    end)
+    H.activeTpConn = conn
+
+    while not reached and H.tpId == currentTpId do
+        task.wait(0.1)
+    end
+end
+
+-- ============================================================
+-- MODULE REGISTRY
+-- ============================================================
+Core.modules = {}
+
+function Core.register(name, mod)
+    Core.modules[name] = mod
+    print("[Core] Module loaded: " .. tostring(name))
+end
+
+function Core.get(name)
+    return Core.modules[name]
+end
+
+function Core.start(name, ...)
+    local m = Core.modules[name]
+    if not m or not m.start then
+        Core.notify("Core", "Module '" .. tostring(name) .. "' not found or has no start()", 4)
+        return false
+    end
+    local ok, err = pcall(m.start, ...)
+    if not ok then
+        Core.notify("Core", "start() error in '" .. tostring(name) .. "': " .. tostring(err), 5)
+        return false
+    end
+    return true
+end
+
+function Core.stop(name)
+    local m = Core.modules[name]
+    if not m or not m.stop then return false end
+    local ok, err = pcall(m.stop)
+    if not ok then
+        Core.notify("Core", "stop() error in '" .. tostring(name) .. "': " .. tostring(err), 5)
+        return false
+    end
+    return true
+end
+
+function Core.isRunning(name)
+    local m = Core.modules[name]
+    if m and m.isRunning then
+        local ok, res = pcall(m.isRunning)
+        return ok and res == true
+    end
+    return false
+end
+
+getgenv().PrinceCore = Core
+return Core
+-- ============================================================
+-- BANANA UI WRAPPER
+-- ============================================================
+local Core = getgenv().PrinceCore
+if not Core then error("[ui_banana] PrinceCore not loaded") end
+
+-- 🔧 SỬA URL BANANA LIB CỦA BẠN Ở ĐÂY
+local BANANA_URL = "https://raw.githubusercontent.com/daykits/Ui-banana.lua/refs/heads/main/RONG_UI01"
+
+-- Dùng banana lib đã load sẵn nếu có, hoặc load từ URL
+local Banana = getgenv().BananaLib
+if not Banana then
+    Banana = loadstring(game:HttpGet(BANANA_URL))()
+    getgenv().BananaLib = Banana
+end
+
+-- Tạo window
+local Window = Banana:MakeWindow({
+    Name = "Prince Hub",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "PrinceHub",
+    IntroEnabled = false,
+})
+
+-- Notify helper
+_G.BananaNotify = function(text, dur)
+    pcall(function()
+        if Banana.MakeNotification then
+            Banana:MakeNotification({
+                Name = "Prince Hub",
+                Content = tostring(text),
+                Time = dur or 4,
+                Image = "rbxassetid://0",
+            })
+        else
+            print("[Notify] " .. tostring(text))
+        end
+    end)
+end
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+local function makeTab(name, icon)
+    return Window:MakeTab({
+        Name = tostring(name),
+        Icon = icon or "rbxassetid://0",
+        PremiumOnly = false,
+    })
+end
+
+local function section(tab, name)
+    return tab:AddSection({ Name = tostring(name) })
+end
+
+local function toggle(tab, name, default, flag, callback)
+    return tab:AddToggle({
+        Name = tostring(name),
+        Default = default == true,
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+local function slider(tab, name, default, min, max, flag, callback)
+    return tab:AddSlider({
+        Name = tostring(name),
+        Default = default,
+        Min = min,
+        Max = max,
+        Increment = 1,
+        Color = Color3.fromRGB(255, 170, 0),
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+local function button(tab, name, callback)
+    return tab:AddButton({
+        Name = tostring(name),
+        Callback = callback,
+    })
+end
+
+local function dropdown(tab, name, default, options, flag, callback)
+    return tab:AddDropdown({
+        Name = tostring(name),
+        Default = default,
+        Options = options,
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+local function multiDropdown(tab, name, default, options, flag, callback)
+    return tab:AddDropdown({
+        Name = tostring(name),
+        Default = default,
+        Options = options,
+        AllowMultiple = true,
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+local function textbox(tab, name, default, flag, callback)
+    return tab:AddTextbox({
+        Name = tostring(name),
+        Default = default or "",
+        TextDisplayer = function(v) return tostring(v) end,
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+local function label(tab, text)
+    if tab.AddLabel then
+        return tab:AddLabel(tostring(text))
+    elseif tab.AddParagraph then
+        return tab:AddParagraph({ Title = "", Content = tostring(text) })
+    end
+end
+
+local function keybind(tab, name, default, flag, callback)
+    return tab:AddKeybind({
+        Name = tostring(name),
+        Default = default,
+        Save = true,
+        Flag = flag,
+        Callback = callback,
+    })
+end
+
+-- Expose cho các module
+getgenv().UI = {
+    Banana    = Banana,
+    Window    = Window,
+    makeTab   = makeTab,
+    section   = section,
+    toggle    = toggle,
+    slider    = slider,
+    button    = button,
+    dropdown  = dropdown,
+    multiDropdown = multiDropdown,
+    textbox   = textbox,
+    label     = label,
+    keybind   = keybind,
+}
+
+print("[UI] Banana window created")
+-- ============================================================
+-- PRINCE HUB - MAIN ENTRY
+-- ============================================================
+
+-- 1. Load Banana lib (nếu bạn có file riêng, set getgenv().BananaLib trước)
+-- getgenv().BananaLib = loadstring(readfile("banana_lib.lua"))()   -- nếu dùng file local
+
+-- 2. Load core
+local Core = loadstring(game:HttpGet("<BASE_URL>/core.lua"))()
+-- Hoặc nếu dùng file local:
+-- local Core = loadstring(readfile("core.lua"))()
+
+-- 3. Load UI wrapper
+loadstring(game:HttpGet("<BASE_URL>/ui_banana.lua"))()
+
+-- 4. Load tất cả modules
+local MODULES = {
+    "movement",
+    "teleport",
+    "misc",
+    "esp",
+    "fish",
+    "haki",
+    "farm_sea1",
+    "farm_sea2",
+    "kaitun",
+    "dungeon",
+}
+
+local loaded = 0
+for _, name in ipairs(MODULES) do
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet("<BASE_URL>/modules/" .. name .. ".lua"))()
+    end)
+    if ok then
+        loaded = loaded + 1
+    else
+        warn("[Main] Failed to load module '" .. name .. "': " .. tostring(err))
+    end
+end
+
+print(("[Prince Hub] Loaded %d/%d modules"):format(loaded, #MODULES))
+-- ============================================================
+-- MODULE: MOVEMENT
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+-- ============================================================
+-- KEY TRACKING
+-- ============================================================
+H.keys = {
+    [Enum.KeyCode.W] = false, [Enum.KeyCode.A] = false,
+    [Enum.KeyCode.S] = false, [Enum.KeyCode.D] = false,
+}
+H.KC_W, H.KC_A, H.KC_S, H.KC_D = Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D
+
+H.UIS.InputBegan:Connect(function(i, gp)
+    if not gp and H.keys[i.KeyCode] ~= nil then H.keys[i.KeyCode] = true end
+end)
+H.UIS.InputEnded:Connect(function(i)
+    if H.keys[i.KeyCode] ~= nil then H.keys[i.KeyCode] = false end
+end)
+
+-- ============================================================
+-- WALKSPEED
+-- ============================================================
+local function stopWS()
+    if H.walkspeedConn then H.walkspeedConn:Disconnect(); H.walkspeedConn = nil end
+end
+
+local function startWS()
+    stopWS()
+    H.walkspeedConn = H.run_svc.Heartbeat:Connect(function()
+        if not H.walkspeedEnabled or H.walkspeedValue <= 16 then return end
+        local char = H.lp.Character or H.getCharFolder()
+        if not char then return end
+        local hum = char:FindFirstChild("Humanoid")
+        local rp  = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not rp or hum.Health <= 0 then return end
+
+        local camCF = workspace.CurrentCamera.CFrame
+        local dir = Vector3.zero
+        if H.keys[H.KC_W] then dir = dir + camCF.LookVector end
+        if H.keys[H.KC_S] then dir = dir - camCF.LookVector end
+        if H.keys[H.KC_A] then dir = dir - camCF.RightVector end
+        if H.keys[H.KC_D] then dir = dir + camCF.RightVector end
+        dir = Vector3.new(dir.X, 0, dir.Z)
+
+        local cv = rp.AssemblyLinearVelocity
+        if dir.Magnitude > 0 then
+            dir = dir.Unit
+            rp.AssemblyLinearVelocity = Vector3.new(dir.X * H.walkspeedValue, cv.Y, dir.Z * H.walkspeedValue)
+            hum:MoveTo(rp.Position + dir * 50)
+        else
+            hum:MoveTo(rp.Position)
+            rp.AssemblyLinearVelocity = Vector3.new(0, cv.Y, 0)
+        end
+    end)
+end
+
+H.startWalkSpeed = startWS
+H.stopWalkSpeed  = stopWS
+
+-- ============================================================
+-- NOCLIP
+-- ============================================================
+local noclipParts = {}
+local noclipChar = nil
+local noclipRefresh = 0
+local lastNoclip = 0
+
+local NOCLIP_RESTORE = { LowerTorso = true, UpperTorso = true, HumanoidRootPart = true }
+
+H.run_svc.Stepped:Connect(function()
+    if not H.noclipActive then return end
+    local now = tick()
+    if now - lastNoclip < 0.05 then return end
+    lastNoclip = now
+
+    local folder = H.getCharFolder()
+    if not folder then return end
+
+    if folder ~= noclipChar or now - noclipRefresh >= 3 then
+        noclipChar = folder
+        noclipRefresh = now
+        noclipParts = {}
+        for _, p in ipairs(folder:GetDescendants()) do
+            if p:IsA("BasePart") then noclipParts[#noclipParts + 1] = p end
+        end
+    end
+    for i = 1, #noclipParts do
+        local p = noclipParts[i]
+        if p and p.Parent then p.CanCollide = false end
+    end
+end)
+
+-- ============================================================
+-- INFINITE JUMP
+-- ============================================================
+local ijHum
+local ijRP
+local ijLastJump = 0
+local ijGround = true
+local ijPending = false
+local IJ_COOLDOWN = 0.15
+local IJ_POWER = 50
+
+local function ijHookState(hum)
+    hum.StateChanged:Connect(function(_, new)
+        if new == Enum.HumanoidStateType.Landed or new == Enum.HumanoidStateType.Running then
+            ijGround = true
+        elseif new == Enum.HumanoidStateType.Freefall or new == Enum.HumanoidStateType.Jumping then
+            ijGround = false
+        end
+    end)
+end
+
+local function ijBind(char)
+    if not char then return end
+    ijHum = char:WaitForChild("Humanoid", 5)
+    ijRP  = char:WaitForChild("HumanoidRootPart", 5)
+    if ijHum then ijHookState(ijHum) end
+end
+
+if H.lp.Character then ijBind(H.lp.Character) end
+H.lp.CharacterAdded:Connect(ijBind)
+
+H.run_svc.Heartbeat:Connect(function()
+    if not ijPending then return end
+    ijPending = false
+    if ijHum and ijHum.Health > 0 and ijRP then
+        local v = ijRP.AssemblyLinearVelocity
+        ijRP.AssemblyLinearVelocity = Vector3.new(v.X, IJ_POWER, v.Z)
+        ijHum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+H.UIS.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if inp.KeyCode == Enum.KeyCode.Space or inp.KeyCode == Enum.KeyCode.ButtonA then
+        if not H.infiniteJumpEnabled or ijGround then return end
+        local now = tick()
+        if now - ijLastJump < IJ_COOLDOWN then return end
+        ijPending = true
+        ijLastJump = now
+    end
+end)
+
+-- ============================================================
+-- REGISTER
+-- ============================================================
+Core.register("movement", {
+    start = function()
+        H.walkspeedEnabled = true
+        startWS()
+    end,
+    stop = function()
+        H.walkspeedEnabled = false
+        stopWS()
+    end,
+    isRunning = function() return H.walkspeedEnabled end,
+
+    setWalkspeed = function(v) H.walkspeedValue = v end,
+    setNoclip = function(v) H.noclipActive = v end,
+    setInfJump = function(v) H.infiniteJumpEnabled = v end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Movement", "rbxassetid://0")
+
+UI.section(Tab, "WalkSpeed")
+UI.toggle(Tab, "Enable WalkSpeed", false, "Movement_WalkSpeed", function(v)
+    H.walkspeedEnabled = v
+    if v then startWS() else stopWS() end
+end)
+UI.slider(Tab, "Speed", 45, 16, 300, "Movement_Speed", function(v)
+    H.walkspeedValue = v
+end)
+UI.button(Tab, "Reset Speed", function()
+    H.walkspeedValue = 16
+    Core.notify("Movement", "Speed reset to 16", 3)
+end)
+
+UI.section(Tab, "Noclip")
+UI.toggle(Tab, "Noclip", false, "Movement_Noclip", function(v)
+    H.noclipActive = v
+end)
+
+UI.section(Tab, "Jump")
+UI.toggle(Tab, "Infinite Jump", false, "Movement_InfJump", function(v)
+    H.infiniteJumpEnabled = v
+end)
+
+UI.section(Tab, "FOV")
+UI.slider(Tab, "Field of View", 70, 30, 120, "Movement_FOV", function(v)
+    workspace.CurrentCamera.FieldOfView = v
+end)
+-- ============================================================
+-- MODULE: TELEPORT
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+local SEA1_ISLANDS = {
+    ["Baratie"]            = Vector3.new(-2978.326, 52.587, -6801.332),
+    ["Coliseum"]           = Vector3.new(-2033.487, 6.854, -7670.064),
+    ["Fishman Island"]     = Vector3.new(1816.722, 4.075, -12173.344),
+    ["Haki Island"]        = Vector3.new(-4380.261, 7.482, -3143.222),
+    ["Island of Zoo"]      = Vector3.new(-3151.212, 11.734, -5236.932),
+    ["Loguetown"]          = Vector3.new(-6590.296, 7.225, -7670.699),
+    ["Marineford F1"]      = Vector3.new(425.249, 19.452, -4478.649),
+    ["Marineford G1"]      = Vector3.new(-5990.909, 57.246, -11492.621),
+    ["Orange Town"]        = Vector3.new(-2978.326, 52.587, -6801.332),
+    ["Reverse Mountain"]   = Vector3.new(-8027.381, 18.727, -8767.213),
+    ["Sandora"]            = Vector3.new(-1540.203, 3.975, -3343.566),
+    ["Shell Town"]         = Vector3.new(-1297.506, 4.125, -5056.664),
+    ["Shrine"]             = Vector3.new(-7350.260, 3.274, -14948.746),
+    ["Skypiea"]            = Vector3.new(3456.082, 1438.244, -9080.484),
+    ["Sphinx Island"]      = Vector3.new(-4000.557, 42.166, -9152.484),
+    ["Town of Beginnings"] = Vector3.new(-502.381, 5.950, -3414.961),
+}
+
+local SEA2_ISLANDS = {
+    ["Desert Kingdom"]    = Vector3.new(-3672.473, 19.368, 402.232),
+    ["Reverse Mountain 2"]= Vector3.new(-6348.723, 128.017, 399.657),
+    ["Coliseum 2"]        = Vector3.new(2218.833, 4.759, 6073.599),
+    ["Rose Kingdom"]      = Vector3.new(9248.953, 24.973, 7841.948),
+    ["Roger Island"]      = Vector3.new(12562.259, 7.529, 2829.644),
+    ["Foro Island"]       = Vector3.new(8151.155, 6.330, 4322.578),
+    ["Sakura Stronghold"] = Vector3.new(6067.310, 12.542, -91.792),
+    ["Impel Down"]        = Vector3.new(5935.760, 5.724, -9471.919),
+    ["Juzo Island"]       = Vector3.new(1754.319, 19.776, -10563.824),
+    ["Sett's Arena"]      = Vector3.new(-7732.424, 9.979, -8120.898),
+}
+
+local function getSortedKeys(t)
+    local keys = {}
+    for k in pairs(t) do table.insert(keys, k) end
+    table.sort(keys)
+    return keys
+end
+
+-- ============================================================
+-- REGISTER
+-- ============================================================
+Core.register("teleport", {
+    start = function() end,
+    stop = function() end,
+    isRunning = function() return false end,
+    teleport = function(pos) H.DoSafeTeleport(pos) end,
+    SEA1 = SEA1_ISLANDS,
+    SEA2 = SEA2_ISLANDS,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Teleport", "rbxassetid://0")
+
+UI.section(Tab, "Sea 1 Islands")
+UI.dropdown(Tab, "Sea 1 Island", "Baratie", getSortedKeys(SEA1_ISLANDS), "TP_Sea1Select", function() end)
+UI.button(Tab, "Teleport (Sea 1)", function()
+    local sel = UI.Banana.Options and UI.Banana.Options.TP_Sea1Select
+    local name = sel and sel.Value or "Baratie"
+    local pos = SEA1_ISLANDS[name]
+    if pos then
+        Core.notify("Teleport", "Heading to " .. name, 3)
+        task.spawn(function() H.DoSafeTeleport(pos) end)
+    end
+end)
+
+UI.section(Tab, "Sea 2 Islands")
+UI.dropdown(Tab, "Sea 2 Island", "Desert Kingdom", getSortedKeys(SEA2_ISLANDS), "TP_Sea2Select", function() end)
+UI.button(Tab, "Teleport (Sea 2)", function()
+    local sel = UI.Banana.Options and UI.Banana.Options.TP_Sea2Select
+    local name = sel and sel.Value or "Desert Kingdom"
+    local pos = SEA2_ISLANDS[name]
+    if pos then
+        Core.notify("Teleport", "Heading to " .. name, 3)
+        task.spawn(function() H.DoSafeTeleport(pos) end)
+    end
+end)
+
+UI.section(Tab, "World Scroll")
+UI.button(Tab, "Get World Scroll", function()
+    task.spawn(function()
+        H.DoSafeTeleport(Vector3.new(-7348.136, 3.274, -14951.547))
+        task.wait(0.5)
+        local vim = Instance.new("VirtualInputManager")
+        vim:SendKeyEvent(true, Enum.KeyCode.LeftAlt, false, nil)
+        task.wait(2)
+        vim:SendKeyEvent(false, Enum.KeyCode.LeftAlt, false, nil)
+        vim:Destroy()
+        Core.notify("Teleport", "World Scroll picked up", 3)
+    end)
+end)
+
+UI.section(Tab, "Geppo")
+UI.button(Tab, "Buy Geppo", function()
+    task.spawn(function()
+        H.DoSafeTeleport(Vector3.new(-3087.715, 94.544, -11755.474))
+        task.wait(1.2)
+        pcall(function()
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("learnStyle"):FireServer("skyWalkTrainer")
+        end)
+        Core.notify("Teleport", "Geppo bought", 3)
+    end)
+end)
+-- ============================================================
+-- MODULE: MISC
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+-- ============================================================
+-- AUTO ADS
+-- ============================================================
+task.spawn(function()
+    local adEvent = H.RS:WaitForChild("Events"):WaitForChild("ADShop")
+    while true do
+        if H.autoAdsEnabled then
+            pcall(function() adEvent:FireServer(3457788725, "536248645108658") end)
+        end
+        task.wait(10)
+    end
+end)
+
+-- ============================================================
+-- AUTO STATS
+-- ============================================================
+task.spawn(function()
+    local statsEvent = H.RS:WaitForChild("Events"):WaitForChild("stats")
+    while true do
+        if H.autoStatsEnabled then
+            local mystats = H.RS:FindFirstChild("Stats" .. H.lp.Name)
+            local statsFolder = mystats and mystats:FindFirstChild("Stats")
+            local statPoints = statsFolder and statsFolder:FindFirstChild("SkillPoints")
+            if statPoints and statPoints.Value > 0 then
+                local pts = statPoints.Value
+                local strengthStat = statsFolder:FindFirstChild("Strength")
+                local curStrength = strengthStat and strengthStat.Value or 0
+                for _ = 1, pts do
+                    if not H.autoStatsEnabled then break end
+                    if curStrength < 750 then
+                        pcall(function() statsEvent:FireServer("Strength", nil, 1) end)
+                        curStrength = curStrength + 1
+                    end
+                    pcall(function() statsEvent:FireServer("Defense", nil, 1) end)
+                    task.wait(0.1)
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- ============================================================
+-- SKIN CHANGER
+-- ============================================================
+H.SKIN_MATERIAL_LIST = {
+    "Neon", "ForceField", "Glass", "SmoothPlastic", "Plastic", "Metal",
+    "DiamondPlate", "Foil", "Cobblestone", "Concrete", "Fabric", "Grass",
+    "Ice", "Marble", "Pebble", "Rock", "Sand", "Slate", "Wood", "WoodPlanks",
+}
+H.skinChangerEnabled  = false
+H.skinChangerColor    = Color3.fromRGB(255, 105, 180)
+H.skinChangerMaterial = Enum.Material.Neon
+
+local function applySkin()
+    local folder = H.getCharFolder()
+    if not folder then return end
+    for _, p in ipairs(folder:GetDescendants()) do
+        if p and p.Parent and p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+            pcall(function()
+                p.Color    = H.skinChangerColor
+                p.Material = H.skinChangerMaterial
+            end)
+        end
+    end
+end
+
+local skinConn = nil
+local function startSkin()
+    if skinConn then return end
+    local last = 0
+    skinConn = H.run_svc.Heartbeat:Connect(function()
+        if tick() - last < 1 then return end
+        last = tick()
+        applySkin()
+    end)
+end
+local function stopSkin()
+    if skinConn then skinConn:Disconnect(); skinConn = nil end
+end
+
+-- ============================================================
+-- REGISTER
+-- ============================================================
+Core.register("misc", {
+    start = function() end,
+    stop = function() end,
+    isRunning = function() return false end,
+    setAds = function(v) H.autoAdsEnabled = v end,
+    setStats = function(v) H.autoStatsEnabled = v end,
+    setSkin = function(v)
+        H.skinChangerEnabled = v
+        if v then startSkin() else stopSkin() end
+    end,
+    setSkinColor = function(c) H.skinChangerColor = c; if H.skinChangerEnabled then applySkin() end end,
+    setSkinMaterial = function(m) H.skinChangerMaterial = Enum.Material[m] or Enum.Material.Neon; if H.skinChangerEnabled then applySkin() end end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Misc", "rbxassetid://0")
+
+UI.section(Tab, "Auto Rewards")
+UI.toggle(Tab, "Auto Ads", false, "Misc_AutoAds", function(v)
+    H.autoAdsEnabled = v
+end)
+UI.toggle(Tab, "Auto Stats", false, "Misc_AutoStats", function(v)
+    H.autoStatsEnabled = v
+end)
+
+UI.section(Tab, "Skin Changer")
+UI.toggle(Tab, "Enable Skin Changer", false, "Misc_SkinToggle", function(v)
+    H.skinChangerEnabled = v
+    if v then startSkin() else stopSkin() end
+end)
+UI.dropdown(Tab, "Material", "Neon", H.SKIN_MATERIAL_LIST, "Misc_SkinMaterial", function(v)
+    H.skinChangerMaterial = Enum.Material[v] or Enum.Material.Neon
+    if H.skinChangerEnabled then applySkin() end
+end)
+
+UI.section(Tab, "Server")
+UI.button(Tab, "Rejoin Server", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, H.lp)
+end)
+-- ============================================================
+-- MODULE: ESP (Player + Chest + Machine + Island)
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+local camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+
+-- ============================================================
+-- PLAYER ESP
+-- ============================================================
+local espSettings = {
+    master_switch = false,
+    boxes    = { enabled = true, color = Color3.fromRGB(255,255,255) },
+    names    = { enabled = true, color = Color3.fromRGB(255,255,255) },
+    distance = true,
+    health   = { enabled = true, thickness = 1 },
+}
+H.espSettings = espSettings
+
+local espScreenGui = Instance.new("ScreenGui")
+espScreenGui.Name = "PrincePlayerESP"
+espScreenGui.ResetOnSpawn = false
+espScreenGui.IgnoreGuiInset = true
+pcall(function()
+    local pg = (protectgui or (syn and syn.protect_gui))
+    if pg then pg(espScreenGui) end
+    espScreenGui.Parent = CoreGui
+end)
+if not espScreenGui.Parent then
+    espScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+end
+H.esp_screen_gui = espScreenGui
+
+local espObjects = {}
+H.esp_objects = espObjects
+
+local function createPlayerESP(player)
+    if player == Players.LocalPlayer then return end
+    if espObjects[player.Name] then return end
+
+    local folder = Instance.new("Folder")
+    folder.Name = player.Name
+    folder.Parent = espScreenGui
+
+    local box = Instance.new("Frame")
+    box.Name = "Box"
+    box.BackgroundColor3 = Color3.new(1,1,1)
+    box.BackgroundTransparency = 0.7
+    box.BorderSizePixel = 0
+    box.Visible = false
+    box.Parent = folder
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.new(1,1,1)
+    stroke.Thickness = 1
+    stroke.Parent = box
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.new(1,1,1)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextSize = 13
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = player.Name
+    nameLabel.Size = UDim2.new(0, 200, 0, 16)
+    nameLabel.Visible = false
+    nameLabel.Parent = folder
+
+    local healthBg = Instance.new("Frame")
+    healthBg.Name = "HealthBg"
+    healthBg.BackgroundColor3 = Color3.new(0,0,0)
+    healthBg.BorderSizePixel = 0
+    healthBg.Visible = false
+    healthBg.Parent = folder
+
+    local healthFill = Instance.new("Frame")
+    healthFill.Name = "HealthFill"
+    healthFill.BackgroundColor3 = Color3.fromRGB(0,255,0)
+    healthFill.BorderSizePixel = 0
+    healthFill.Size = UDim2.fromScale(1,1)
+    healthFill.Parent = healthBg
+
+    espObjects[player.Name] = {
+        player = player,
+        folder = folder,
+        box = box,
+        stroke = stroke,
+        nameLabel = nameLabel,
+        healthBg = healthBg,
+        healthFill = healthFill,
+    }
+end
+
+local function removePlayerESP(nameOrPlayer)
+    local name = typeof(nameOrPlayer) == "Instance" and nameOrPlayer.Name or nameOrPlayer
+    local obj = espObjects[name]
+    if obj and obj.folder then obj.folder:Destroy() end
+    espObjects[name] = nil
+end
+
+for _, p in ipairs(Players:GetPlayers()) do createPlayerESP(p) end
+Players.PlayerAdded:Connect(createPlayerESP)
+Players.PlayerRemoving:Connect(removePlayerESP)
+
+-- Update loop
+H.run_svc.RenderStepped:Connect(function()
+    local enabled = espSettings.master_switch
+    for name, d in pairs(espObjects) do
+        if not enabled or not d.player or not d.player.Parent then
+            d.box.Visible = false
+            d.nameLabel.Visible = false
+            d.healthBg.Visible = false
+        else
+            local char = d.player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then
+                d.box.Visible = false
+                d.nameLabel.Visible = false
+                d.healthBg.Visible = false
+            else
+                local sp, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if not onScreen then
+                    d.box.Visible = false
+                    d.nameLabel.Visible = false
+                    d.healthBg.Visible = false
+                else
+                    local dist = (camera.CFrame.Position - hrp.Position).Magnitude
+                    local h = math.clamp(7500 / dist, 20, 500)
+                    local w = h * 0.5
+
+                    if espSettings.boxes.enabled then
+                        d.box.Visible = true
+                        d.box.Size = UDim2.fromOffset(w, h)
+                        d.box.Position = UDim2.fromOffset(sp.X - w/2, sp.Y - h/2)
+                        d.stroke.Color = espSettings.boxes.color
+                    else
+                        d.box.Visible = false
+                    end
+
+                    if espSettings.names.enabled then
+                        d.nameLabel.Visible = true
+                        d.nameLabel.Text = d.player.Name
+                        if espSettings.distance then
+                            d.nameLabel.Text = d.player.Name .. " [" .. math.floor(dist) .. "m]"
+                        end
+                        d.nameLabel.TextColor3 = espSettings.names.color
+                        d.nameLabel.Size = UDim2.fromOffset(math.max(w + 60, 100), 16)
+                        d.nameLabel.Position = UDim2.fromOffset(sp.X - d.nameLabel.Size.X.Offset/2, sp.Y - h/2 - 18)
+                    else
+                        d.nameLabel.Visible = false
+                    end
+
+                    if espSettings.health.enabled then
+                        d.healthBg.Visible = true
+                        d.healthBg.Size = UDim2.fromOffset(espSettings.health.thickness + 2, h)
+                        d.healthBg.Position = UDim2.fromOffset(sp.X - w/2 - espSettings.health.thickness - 6, sp.Y - h/2)
+                        local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        d.healthFill.Size = UDim2.fromScale(1, ratio)
+                        d.healthFill.Position = UDim2.new(0, 0, 1 - ratio, 0)
+                        d.healthFill.BackgroundColor3 = Color3.fromHSV(ratio * 0.3, 1, 1)
+                    else
+                        d.healthBg.Visible = false
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================================
+-- CHEST ESP
+-- ============================================================
+H.chestESPEnabled = false
+H.chestHighlights = {}
+H.miscSelectedChests = {}
+
+local rarityColors = {
+    ["Mythical Chest"]  = Color3.fromRGB(255, 50, 255),
+    ["Legendary Chest"] = Color3.fromRGB(255, 215, 0),
+}
+
+local function looksLikeChest(obj)
+    if not obj then return false end
+    local ln = string.lower(obj.Name or "")
+    if ln:find("chest") then return true end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            local t = string.lower(d.ObjectText or "")
+            if t:find("legendary chest") or t:find("mythical chest") then return true end
+        end
+    end
+    return false
+end
+
+local function getChestRarity(obj)
+    if not obj then return nil end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            if d.ObjectText == "Legendary Chest" then return "Legendary Chest" end
+            if d.ObjectText == "Mythical Chest" then return "Mythical Chest" end
+        end
+    end
+    return nil
+end
+
+local function createChestESP(container)
+    if not container or not container.Parent then return end
+    if H.chestHighlights[container] then return end
+    if not looksLikeChest(container) then return end
+    local rarity = getChestRarity(container)
+    if not rarity then return end
+    if not H.miscSelectedChests[rarity] then return end
+
+    local root = container:IsA("Model") and (container.PrimaryPart or container:FindFirstChildWhichIsA("BasePart", true)) or container:FindFirstChildWhichIsA("BasePart", true)
+    if not root then return end
+
+    local hl = Instance.new("SelectionBox")
+    hl.Name = "_ChestHL"
+    hl.Adornee = root
+    hl.Color3 = rarityColors[rarity] or Color3.new(1,1,1)
+    hl.LineThickness = 0.05
+    hl.SurfaceTransparency = 0.85
+    hl.SurfaceColor3 = rarityColors[rarity] or Color3.new(1,1,1)
+    hl.Parent = CoreGui
+
+    H.chestHighlights[container] = { highlight = hl, part = root, rarity = rarity }
+end
+
+local function clearChestESP()
+    for container, data in pairs(H.chestHighlights) do
+        if data.highlight then data.highlight:Destroy() end
+    end
+    H.chestHighlights = {}
+end
+
+local function refreshChestESP()
+    clearChestESP()
+    if not H.chestESPEnabled then return end
+    local effects = workspace:FindFirstChild("Effects")
+    if not effects then return end
+    for _, child in ipairs(effects:GetChildren()) do
+        createChestESP(child)
+        for _, sub in ipairs(child:GetDescendants()) do
+            if looksLikeChest(sub) then createChestESP(sub) end
+        end
+    end
+end
+H.refreshChestESP = refreshChestESP
+H.clearChestESP = clearChestESP
+
+task.spawn(function()
+    local effects = workspace:WaitForChild("Effects", 30)
+    if not effects then return end
+    effects.ChildAdded:Connect(function(c)
+        if not H.chestESPEnabled then return end
+        task.delay(0.25, function() createChestESP(c) end)
+    end)
+end)
+
+-- ============================================================
+-- MACHINE ESP
+-- ============================================================
+H.machineESPEnabled = false
+H.machineHighlights = {}
+
+local MACHINE_COLOR = Color3.fromRGB(0, 170, 255)
+
+local function normalizeMachineName(txt)
+    if type(txt) ~= "string" or txt == "" then return nil end
+    txt = string.lower(txt)
+    if txt:find("devil") and txt:find("fruit") then return "Devil Fruit"
+    elseif txt:find("fight") and txt:find("style") then return "Fighting Style"
+    elseif txt:find("weapon") then return "Weapons"
+    elseif txt:find("armor") or txt:find("armour") then return "Armor"
+    elseif txt:find("geppo") then return "Geppo"
+    elseif txt:find("drink") or txt:find("cola") then return "Drinks"
+    end
+    return nil
+end
+
+local function detectMachine(obj)
+    if not obj then return nil end
+    local attrs = {
+        obj:GetAttribute("VendingType"),
+        obj:GetAttribute("itemName"),
+        obj:GetAttribute("ItemName"),
+        obj:GetAttribute("MachineName"),
+        obj.Name,
+    }
+    for _, v in ipairs(attrs) do
+        local d = normalizeMachineName(v)
+        if d then return d end
+    end
+    for _, ch in ipairs(obj:GetDescendants()) do
+        if ch:IsA("ProximityPrompt") then
+            local d = normalizeMachineName(ch.ObjectText) or normalizeMachineName(ch.ActionText)
+            if d then return d end
+        elseif ch:IsA("TextLabel") then
+            local d = normalizeMachineName(ch.Text)
+            if d then return d end
+        elseif ch:IsA("StringValue") then
+            local d = normalizeMachineName(ch.Value)
+            if d then return d end
+        end
+    end
+    return nil
+end
+
+local function createMachineESP(obj)
+    if not obj or not obj.Parent then return end
+    if H.machineHighlights[obj] then return end
+    local name = detectMachine(obj)
+    if not name then return end
+
+    local root = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)) or obj:FindFirstChildWhichIsA("BasePart", true)
+    if not root then return end
+
+    local hl = Instance.new("SelectionBox")
+    hl.Name = "_MachineHL"
+    hl.Adornee = root
+    hl.Color3 = MACHINE_COLOR
+    hl.LineThickness = 0.05
+    hl.SurfaceTransparency = 0.8
+    hl.SurfaceColor3 = MACHINE_COLOR
+    hl.Parent = CoreGui
+
+    H.machineHighlights[obj] = { highlight = hl, name = name, root = root }
+end
+
+local function clearMachineESP()
+    for obj, data in pairs(H.machineHighlights) do
+        if data.highlight then data.highlight:Destroy() end
+    end
+    H.machineHighlights = {}
+end
+
+local function refreshMachineESP()
+    clearMachineESP()
+    if not H.machineESPEnabled then return end
+    local env = workspace:FindFirstChild("Env")
+    if not env then return end
+    for _, child in ipairs(env:GetChildren()) do
+        createMachineESP(child)
+    end
+end
+H.refreshMachineESP = refreshMachineESP
+H.clearMachineESP = clearMachineESP
+
+task.spawn(function()
+    local env = workspace:WaitForChild("Env", 30)
+    if not env then return end
+    env.ChildAdded:Connect(function(c)
+        if not H.machineESPEnabled then return end
+        task.delay(0.3, function() createMachineESP(c) end)
+    end)
+end)
+
+-- ============================================================
+-- ISLAND ESP (simplified: name + distance labels)
+-- ============================================================
+H.islandESP1Enabled = false
+H.islandESP2Enabled = false
+
+local islandGui = Instance.new("ScreenGui")
+islandGui.Name = "PrinceIslandESP"
+islandGui.ResetOnSpawn = false
+islandGui.IgnoreGuiInset = true
+pcall(function()
+    local pg = (protectgui or (syn and syn.protect_gui))
+    if pg then pg(islandGui) end
+    islandGui.Parent = CoreGui
+end)
+if not islandGui.Parent then
+    islandGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local SEA1_ISLE = {
+    ["Baratie"] = Vector3.new(-2978.326, 52.587, -6801.332),
+    ["Fishman Island"] = Vector3.new(1816.722, 4.075, -12173.344),
+    ["Haki Island"] = Vector3.new(-4380.261, 7.482, -3143.222),
+    ["Island of Zoo"] = Vector3.new(-3151.212, 11.734, -5236.932),
+    ["Loguetown"] = Vector3.new(-6590.296, 7.225, -7670.699),
+    ["Marineford F1"] = Vector3.new(425.249, 19.452, -4478.649),
+    ["Marineford G1"] = Vector3.new(-5990.909, 57.246, -11492.621),
+    ["Reverse Mountain"] = Vector3.new(-8027.381, 18.727, -8767.213),
+    ["Sandora"] = Vector3.new(-1540.203, 3.975, -3343.566),
+    ["Shell Town"] = Vector3.new(-1297.506, 4.125, -5056.664),
+    ["Shrine"] = Vector3.new(-7350.260, 3.274, -14948.746),
+    ["Skypiea"] = Vector3.new(3456.082, 1438.244, -9080.484),
+    ["Sphinx Island"] = Vector3.new(-4000.557, 42.166, -9152.484),
+    ["Town of Beginnings"] = Vector3.new(-502.381, 5.950, -3414.961),
+}
+
+local SEA2_ISLE = {
+    ["Desert Kingdom"] = Vector3.new(-3672.473, 19.368, 402.232),
+    ["Rose Kingdom"] = Vector3.new(9248.953, 24.973, 7841.948),
+    ["Roger Island"] = Vector3.new(12562.259, 7.529, 2829.644),
+    ["Impel Down"] = Vector3.new(5935.760, 5.724, -9471.919),
+    ["Juzo Island"] = Vector3.new(1754.319, 19.776, -10563.824),
+}
+
+local islandLabels = {}
+
+local function getIslandLabel(key, name)
+    if not islandLabels[key] then
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "Isle_" .. key
+        lbl.BackgroundTransparency = 1
+        lbl.TextStrokeTransparency = 0.4
+        lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 13
+        lbl.TextColor3 = Color3.new(1, 1, 1)
+        lbl.Size = UDim2.new(0, 200, 0, 16)
+        lbl.AnchorPoint = Vector2.new(0.5, 1)
+        lbl.ZIndex = 50
+        lbl.Visible = false
+        lbl.Parent = islandGui
+        islandLabels[key] = lbl
+    end
+    return islandLabels[key]
+end
+
+local function updateIslandESP(islands, enabled, prefix)
+    if not enabled then
+        for k, lbl in pairs(islandLabels) do
+            if k:sub(1, #prefix) == prefix then lbl.Visible = false end
+        end
+        return
+    end
+    local hrp = H.getLocalHRP()
+    if not hrp then return end
+    for name, pos in pairs(islands) do
+        local key = prefix .. name
+        local lbl = getIslandLabel(key, name)
+        local sp, on = camera:WorldToViewportPoint(pos)
+        if on and sp.Z > 0 then
+            local dist = math.floor((hrp.Position - pos).Magnitude)
+            lbl.Text = name .. " [" .. dist .. "m]"
+            lbl.Position = UDim2.new(0, sp.X, 0, sp.Y - 4)
+            lbl.Visible = true
+        else
+            lbl.Visible = false
+        end
+    end
+end
+
+H.run_svc.RenderStepped:Connect(function()
+    updateIslandESP(SEA1_ISLE, H.islandESP1Enabled, "S1_")
+    updateIslandESP(SEA2_ISLE, H.islandESP2Enabled, "S2_")
+end)
+
+-- ============================================================
+-- REGISTER
+-- ============================================================
+Core.register("esp", {
+    start = function() espSettings.master_switch = true end,
+    stop  = function() espSettings.master_switch = false end,
+    isRunning = function() return espSettings.master_switch end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("ESP", "rbxassetid://0")
+
+UI.section(Tab, "Player ESP")
+UI.toggle(Tab, "Enable ESP", false, "ESP_Master", function(v) espSettings.master_switch = v end)
+UI.toggle(Tab, "Boxes", true, "ESP_Boxes", function(v) espSettings.boxes.enabled = v end)
+UI.toggle(Tab, "Names", true, "ESP_Names", function(v) espSettings.names.enabled = v end)
+UI.toggle(Tab, "Distance", true, "ESP_Dist", function(v) espSettings.distance = v end)
+UI.toggle(Tab, "Health Bar", true, "ESP_Health", function(v) espSettings.health.enabled = v end)
+UI.slider(Tab, "Health Thickness", 1, 1, 10, "ESP_HealthThick", function(v) espSettings.health.thickness = v end)
+
+UI.section(Tab, "World ESP")
+UI.toggle(Tab, "Chest ESP", false, "ESP_Chest", function(v)
+    H.chestESPEnabled = v
+    if v then
+        H.miscSelectedChests = { ["Legendary Chest"] = true, ["Mythical Chest"] = true }
+    else
+        H.miscSelectedChests = {}
+    end
+    refreshChestESP()
+end)
+UI.toggle(Tab, "Machine ESP", false, "ESP_Machine", function(v)
+    H.machineESPEnabled = v
+    refreshMachineESP()
+end)
+
+UI.section(Tab, "Island ESP")
+UI.toggle(Tab, "Island ESP Sea 1", false, "ESP_Isle1", function(v) H.islandESP1Enabled = v end)
+UI.toggle(Tab, "Island ESP Sea 2", false, "ESP_Isle2", function(v) H.islandESP2Enabled = v end)
+-- ============================================================
+-- MODULE: FISH
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+local RS = H.RS
+local LP = H.lp
+local VirtualUser = game:GetService("VirtualUser")
+
+H.fishState = {
+    autoFishing = false,
+    delayed = false,
+    _isCasting = false,
+    waterPos = nil,
+    isPaused = false,
+}
+H.autoBuyBaitEnabled = false
+H.autoBuyBaitAmount = 1
+H.autoBuyBaitInterval = 60
+H.lastBaitBuy = 0
+H.autoBuyRod = false
+H.autoSellFishEnabled = false
+H.sellFishRarities = { Common = true, Rare = true, Legendary = true }
+H.peliCapEnabled = true
+H.peliCapAmount = 1000000
+H._peliCapSellBlocked = false
+
+local fishFolder = RS:FindFirstChild("Fishing")
+local fishRemotes = fishFolder and fishFolder:FindFirstChild("Remotes")
+local FishingAction = fishRemotes and fishRemotes:FindFirstChild("Action")
+
+local ROD_TIERS = {
+    ["Devil Fruit Rod"] = 8, ["ODM Rod"] = 7, ["Jack-O'Rod"] = 6,
+    ["Angler Rod"] = 5, ["Merchants Banana Rod"] = 4, ["Epic Fishing Rod"] = 3,
+    ["Rare Fishing Rod"] = 2, ["Fishing Rod"] = 1,
+}
+
+local function isBlackScreen()
+    local count = 0
+    pcall(function()
+        for _, gui in ipairs(LP.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name == "ScreenGui" and gui.Enabled then
+                count = count + 1
+            end
+        end
+    end)
+    return count > 0
+end
+
+local function getInventoryCount(itemName)
+    local count = 0
+    local function scan(c)
+        if not c then return end
+        for _, obj in ipairs(c:GetChildren()) do
+            if obj.Name == itemName then count = count + 1 end
+        end
+    end
+    scan(LP:FindFirstChild("Backpack"))
+    scan(LP:FindFirstChild("Inventory"))
+    local stats = LP:FindFirstChild("Stats" .. LP.Name) or LP:FindFirstChild("Stats")
+    if stats and stats:FindFirstChild("Inventory") then
+        local item = stats.Inventory:FindFirstChild(itemName)
+        if item then
+            count = count + (tonumber(item.Value) or tonumber(item:GetAttribute("Amount")) or 1)
+        end
+    end
+    return count
+end
+
+local function getRodInstance()
+    local char = LP.Character
+    if not char then return nil end
+    local bestRod, bestTier = nil, -1
+    for rodName, tier in pairs(ROD_TIERS) do
+        local tool = char:FindFirstChild(rodName) or (LP:FindFirstChild("Backpack") and LP.Backpack:FindFirstChild(rodName))
+        if tool and tier > bestTier then
+            bestRod = tool
+            bestTier = tier
+        end
+    end
+    return bestRod
+end
+
+local rodHideConn = nil
+local function hideRod(model)
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Transparency = 1
+            obj.CanCollide = false
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = 1
+        elseif obj:IsA("Beam") or obj:IsA("Trail") then
+            obj.Enabled = false
+        elseif obj:IsA("RopeConstraint") then
+            obj.Visible = false
+        end
+    end
+end
+
+local function toggleRodHider(state)
+    local charFolder = workspace:FindFirstChild("PlayerCharacters")
+    if not charFolder then return end
+    if state then
+        if rodHideConn then return end
+        local pc = charFolder:FindFirstChild(LP.Name)
+        if pc then
+            local function check(child)
+                if child:IsA("Tool") and ROD_TIERS[child.Name] then
+                    task.wait(0.2)
+                    hideRod(child)
+                end
+            end
+            rodHideConn = pc.ChildAdded:Connect(check)
+            for _, c in ipairs(pc:GetChildren()) do check(c) end
+        end
+    else
+        if rodHideConn then rodHideConn:Disconnect(); rodHideConn = nil end
+    end
+end
+
+local function getCurrentPeli()
+    local stats = RS:FindFirstChild("Stats" .. LP.Name)
+    local peliObj = stats and stats:FindFirstChild("Stats") and stats.Stats:FindFirstChild("Peli")
+    return peliObj and peliObj.Value or 0
+end
+
+local function canSellFish()
+    if not H.peliCapEnabled then H._peliCapSellBlocked = false; return true end
+    local cur = getCurrentPeli()
+    if cur >= H.peliCapAmount then
+        if not H._peliCapSellBlocked then
+            H._peliCapSellBlocked = true
+            Core.notify("PeliCap", "Peli >= 1,000,000. Sell paused.", 5)
+        end
+        return false
+    end
+    if H._peliCapSellBlocked then
+        H._peliCapSellBlocked = false
+        Core.notify("PeliCap", "Peli < 1,000,000. Sell resumed.", 4)
+    end
+    return true
+end
+
+local fishOnce = function()
+    if not FishingAction or H.fishState.isPaused then return end
+    if H.fishState.delayed then return end
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    local rod = getRodInstance()
+    if not rod then return end
+
+    if rod.Parent ~= char then
+        hum:EquipTool(rod)
+        task.wait(0.5)
+        return
+    end
+
+    local hook = workspace:FindFirstChild("Effects") and workspace.Effects:FindFirstChild(LP.Name .. "'s hook")
+
+    if not hook then
+        if H.fishState._isCasting then return end
+        H.fishState._isCasting = true
+
+        pcall(function()
+            if mouse2press and mouse2release then
+                mouse2press()
+                task.wait(0.1)
+                mouse2release()
+            else
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new(0, 0))
+            end
+        end)
+        task.wait(0.6)
+
+        local ok, goalPos = pcall(function()
+            local ocean = workspace.Env.WaterStuff.Ocean
+            local oceanCF, oceanSize = ocean.CFrame, ocean.Size
+            local dir = hrp.CFrame.LookVector
+            local castTarget = hrp.Position + (Vector3.new(dir.X, 0, dir.Z).Unit * 20)
+            local localPos = oceanCF:PointToObjectSpace(castTarget)
+            local waterPos = oceanCF:PointToWorldSpace(Vector3.new(
+                math.clamp(localPos.X, -oceanSize.X / 2, oceanSize.X / 2),
+                oceanSize.Y / 2,
+                math.clamp(localPos.Z, -oceanSize.Z / 2, oceanSize.Z / 2)
+            ))
+            local startPos = hrp.Position
+            if startPos.Y < 0 then startPos = Vector3.new(startPos.X, 10, startPos.Z) end
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Include
+            rayParams.FilterDescendantsInstances = { workspace.Env.WaterStuff }
+            local ray = workspace:Raycast(startPos, Vector3.new(0, -2000, 0), rayParams)
+            local gp = ray and ray.Position + Vector3.new(0, 7, 0) or waterPos + Vector3.new(0, 7, 0)
+            return Vector3.new(gp.X, 0, gp.Z)
+        end)
+
+        if not ok then H.fishState._isCasting = false; return end
+        H.fishState.waterPos = goalPos
+
+        local bait = "Common Fish Bait"
+        if getInventoryCount("Legendary Fish Bait") > 0 then
+            bait = "Legendary Fish Bait"
+        elseif getInventoryCount("Rare Fish Bait") > 0 then
+            bait = "Rare Fish Bait"
+        end
+
+        pcall(function() FishingAction:InvokeServer({ Goal = goalPos, Action = "Throw", Bait = bait }) end)
+        task.wait(0.5)
+        pcall(function() FishingAction:InvokeServer({ Action = "Landed" }) end)
+        task.delay(4, function() H.fishState._isCasting = false end)
+    else
+        if hrp.Position.Y > 0 and hrp.Position.Y < 800 and H.fishState.waterPos then
+            pcall(function() hook.CFrame = CFrame.new(H.fishState.waterPos) end)
+        end
+        if hook:GetAttribute("Caught") and not H.fishState.delayed then
+            H.fishState.delayed = true
+            task.delay(7.5, function()
+                if not H.fishState.delayed or not H.fishState.autoFishing or H.fishState.isPaused then return end
+                pcall(function() FishingAction:InvokeServer({ Action = "Reel" }) end)
+                H.fishState.delayed = false
+            end)
+        elseif hook:GetAttribute("MoveMultiplier") and not hook:GetAttribute("Caught") then
+            pcall(function()
+                FishingAction:InvokeServer({ Action = "HookReturning" })
+                FishingAction:InvokeServer({ Action = "Cancel" })
+                hook:Destroy()
+            end)
+        end
+    end
+end
+
+local fishLoopRunning = false
+H.startAutoFishLoop = function()
+    if fishLoopRunning then return end
+    fishLoopRunning = true
+    toggleRodHider(true)
+    task.spawn(function()
+        while task.wait() do
+            if not H.fishState.autoFishing then fishLoopRunning = false; break end
+            if H.fishState.isPaused then continue end
+            if isBlackScreen() then
+                local char = LP.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then hum:UnequipTools() end
+                task.wait(1)
+                continue
+            end
+            local char = LP.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not char or not hum or hum.Health <= 0 then task.wait(1); continue end
+            fishOnce()
+        end
+    end)
+end
+
+H.stopAutoFishLoop = function()
+    H.fishState.autoFishing = false
+    H.fishState.delayed = false
+    H.fishState._isCasting = false
+    H.fishState.isPaused = false
+    toggleRodHider(false)
+    pcall(function()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:UnequipTools() end
+    end)
+end
+
+-- Auto sell fish
+task.spawn(function()
+    local ShopRemote = RS:WaitForChild("FishingShopRemote", 10)
+    local sellList = {
+        { r = "Common", n = "Blue-Lip Grouper" }, { r = "Common", n = "Tigerfin" },
+        { r = "Rare", n = "Candy Corn Squid" }, { r = "Rare", n = "Crimson Polka Puffer" },
+        { r = "Rare", n = "Crimson Snapper" }, { r = "Rare", n = "Exotic Tigerfin" },
+        { r = "Rare", n = "Fangfish" }, { r = "Rare", n = "Zebra Ribbon Angelfish" },
+        { r = "Rare", n = "Skeletal Shark" }, { r = "Legendary", n = "Anglerfish" },
+        { r = "Legendary", n = "Dark Skeletal Shark" }, { r = "Legendary", n = "Jack-O'-Bite" },
+        { r = "Legendary", n = "Swordfish" }, { r = "Legendary", n = "Golden Polka Puffer" },
+        { r = "Legendary", n = "Golden Ribbon Angelfish" }, { r = "Legendary", n = "Golden Tigerfin" },
+    }
+    local idx = 1
+    while true do
+        task.wait(1.5)
+        if H.autoSellFishEnabled and ShopRemote and canSellFish() then
+            for _ = 1, #sellList do
+                local e = sellList[idx]
+                idx = (idx % #sellList) + 1
+                if e and H.sellFishRarities[e.r] then
+                    pcall(function()
+                        ShopRemote:InvokeServer({ Fish = e.n, All = false, Method = "SellFish" })
+                    end)
+                    break
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================================
+-- REGISTER
+-- ============================================================
+Core.register("fish", {
+    start = function()
+        H.fishState.autoFishing = true
+        H.startAutoFishLoop()
+    end,
+    stop = function()
+        H.stopAutoFishLoop()
+    end,
+    isRunning = function() return H.fishState.autoFishing end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Fish", "rbxassetid://0")
+
+UI.section(Tab, "Auto Fish")
+UI.toggle(Tab, "Enable Auto Fish", false, "Fish_Auto", function(v)
+    if v then Core.start("fish") else Core.stop("fish") end
+end)
+
+UI.section(Tab, "Auto Buy Bait")
+UI.toggle(Tab, "Enable Auto Buy Bait", false, "Fish_BuyBait", function(v) H.autoBuyBaitEnabled = v end)
+UI.slider(Tab, "Amount per buy", 1, 1, 50, "Fish_BuyBaitAmt", function(v) H.autoBuyBaitAmount = v end)
+UI.slider(Tab, "Interval (sec)", 60, 10, 600, "Fish_BuyBaitInt", function(v) H.autoBuyBaitInterval = v end)
+
+UI.section(Tab, "Auto Sell")
+UI.toggle(Tab, "Enable Auto Sell", false, "Fish_AutoSell", function(v) H.autoSellFishEnabled = v end)
+UI.toggle(Tab, "Sell Common", true, "Fish_SellCommon", function(v) H.sellFishRarities.Common = v end)
+UI.toggle(Tab, "Sell Rare", true, "Fish_SellRare", function(v) H.sellFishRarities.Rare = v end)
+UI.toggle(Tab, "Sell Legendary", true, "Fish_SellLegendary", function(v) H.sellFishRarities.Legendary = v end)
+
+UI.section(Tab, "Auto Buy Rod")
+UI.toggle(Tab, "Enable Auto Buy Rod", false, "Fish_BuyRod", function(v) H.autoBuyRod = v end)
+-- ============================================================
+-- MODULE: HAKI
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+local RS   = H.RS
+
+H.autoHakiEnabled  = false
+H.autoHakiLoopID   = 0
+H.autoHakiKills    = 0
+H.autoHakiStatus   = "idle"
+H.autoHakiUpHeight = 8.4
+
+local combatRegister = RS:WaitForChild("Events"):WaitForChild("CombatRegister")
+local combatAnims    = RS:WaitForChild("CombatAnimations"):WaitForChild("Melee")
+local questEvent     = RS:WaitForChild("Events"):WaitForChild("Quest")
+local hakiRemote     = RS:WaitForChild("Events"):WaitForChild("Haki")
+
+local HAKI_POS = Vector3.new(-4245, 170, -2989)
+local HAKI_QUEST = "Road to Armament"
+
+local ANIMS = {
+    combatAnims.Punch1, combatAnims.Punch2, combatAnims.Punch3,
+    combatAnims.GroundPunch4, combatAnims.GroundPunch5,
+}
+
+local function equipMelee()
+    local bp = H.lp:FindFirstChild("Backpack"); if not bp then return false end
+    local m = bp:FindFirstChild("Melee"); if not m then return false end
+    local char = H.lp.Character; if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function() hum:EquipTool(m) end)
+    else
+        m.Parent = char
+    end
+    return true
+end
+
+local function getNPCID(npc)
+    if not npc then return nil end
+    local v = npc:FindFirstChild("NPCID"); if v then return v.Value end
+    local cfg = npc:FindFirstChild("Configuration")
+    if cfg then local cv = cfg:FindFirstChild("NPCID"); if cv then return cv.Value end end
+    return npc:GetAttribute("NPCID")
+end
+
+local function getAllYetis()
+    local res = {}
+    local npcs = workspace:FindFirstChild("NPCs"); if not npcs then return res end
+    for _, npc in ipairs(npcs:GetChildren()) do
+        if npc:IsA("Model") and npc.Name == "Yeti" then
+            local hum = npc:FindFirstChild("Humanoid")
+            local hrp = npc:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and hrp then
+                table.insert(res, { npc = npc, hrp = hrp })
+            end
+        end
+    end
+    return res
+end
+
+local function getClosestYeti()
+    local rp = H.getLocalHRP(); if not rp then return nil end
+    local closest, best = nil, math.huge
+    for _, d in ipairs(getAllYetis()) do
+        local dist = (rp.Position - d.hrp.Position).Magnitude
+        if dist < best then best = dist; closest = d.npc end
+    end
+    return closest
+end
+
+local function activateHaki()
+    pcall(function() hakiRemote:FireServer("Buso") end)
+end
+
+local afFloat = function(bool)
+    local rp = H.getLocalHRP(); if not rp then return end
+    if bool then
+        if not rp:FindFirstChild("AH_BV") then
+            local bv = Instance.new("BodyVelocity", rp)
+            bv.Name = "AH_BV"
+            bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            bv.Velocity = Vector3.zero
+        end
+    else
+        local bv = rp:FindFirstChild("AH_BV")
+        if bv then bv:Destroy() end
+    end
+end
+
+local canAttack = true
+
+local function attackYeti(npc, lockedY)
+    if not npc then return end
+    local hum = npc:FindFirstChild("Humanoid")
+    local hrp = npc:FindFirstChild("HumanoidRootPart")
+    if not hum or hum.Health <= 0 or not hrp then return end
+    if not canAttack then return end
+    canAttack = false
+    local rp = H.getLocalHRP()
+    local id = getNPCID(npc)
+
+    for combo = 1, 5 do
+        if not H.autoHakiEnabled then break end
+        hum = npc:FindFirstChild("Humanoid")
+        hrp = npc:FindFirstChild("HumanoidRootPart")
+        if not hum or hum.Health <= 0 or not hrp then break end
+
+        local hrpList = { hrp }
+        local npcIDs = {}
+        if id then table.insert(npcIDs, id) end
+
+        if rp and hrp then
+            rp.AssemblyLinearVelocity = Vector3.zero
+            rp.CFrame = CFrame.lookAt(
+                Vector3.new(hrp.Position.X, lockedY, hrp.Position.Z),
+                Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+            )
+        end
+
+        pcall(function()
+            combatRegister:InvokeServer({
+                [1] = "swingsfx", [2] = "Melee", [3] = combo, [4] = "Ground",
+                [5] = false, [6] = ANIMS[combo], [7] = 1.75, [8] = 1.5
+            })
+            local da = { [1] = {
+                [1] = "damage", [2] = hrpList, [3] = "Melee",
+                [4] = { combo, "Ground", "Melee" }, [5] = true,
+                [6] = rp and rp.CFrame or CFrame.new(),
+                aircombo = "Ground"
+            } }
+            if #npcIDs > 0 then da[1].NPCIDs = npcIDs end
+            combatRegister:InvokeServer(unpack(da))
+        end)
+        task.wait(0.21)
+    end
+    task.wait(1.2)
+    canAttack = true
+end
+
+local function ensureQuest()
+    local qv = Core.getQuest()
+    if qv == HAKI_QUEST then return end
+    H.autoHakiStatus = "quest"
+    H.DoArcTeleport(HAKI_POS)
+    task.wait(1)
+    pcall(function() questEvent:InvokeServer({ "takequest", HAKI_QUEST }) end)
+    task.wait(1)
+end
+
+H.startAutoHaki = function()
+    if H.autoHakiEnabled then return end
+    H.autoHakiEnabled = true
+    H.autoHakiLoopID = H.autoHakiLoopID + 1
+    local loopID = H.autoHakiLoopID
+    H.autoHakiKills = 0
+    canAttack = true
+    afFloat(true)
+    equipMelee()
+    activateHaki()
+    ensureQuest()
+
+    task.spawn(function()
+        while H.autoHakiEnabled and H.autoHakiLoopID == loopID do
+            local char = H.lp.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local rp  = char and char:FindFirstChild("HumanoidRootPart")
+            if not char or not hum or hum.Health <= 0 or not rp then task.wait(0.5); continue end
+            equipMelee()
+            local yeti = getClosestYeti()
+            if not yeti then
+                H.autoHakiStatus = "waiting"
+                H.DoSafeTeleport(HAKI_POS)
+                task.wait(2); continue
+            end
+            local hrp = yeti:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local lockedY = hrp.Position.Y + H.autoHakiUpHeight
+                local targetCF = CFrame.lookAt(
+                    Vector3.new(hrp.Position.X, lockedY, hrp.Position.Z),
+                    Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+                )
+                if (rp.Position - targetCF.Position).Magnitude > 6 then
+                    H.autoHakiStatus = "teleporting"
+                    H.DoSafeTeleport(targetCF.Position)
+                end
+                H.autoHakiStatus = "killing"
+                task.wait(0.15)
+                attackYeti(yeti, lockedY)
+                local ah = yeti:FindFirstChild("Humanoid")
+                if not ah or ah.Health <= 0 then
+                    H.autoHakiKills = H.autoHakiKills + 1
+                    if H.autoHakiKills >= 50 then
+                        H.autoHakiStatus = "idle"
+                        H.stopAutoHaki()
+                        Core.notify("Haki", "50 Yeti killed — quest complete!", 5)
+                        break
+                    end
+                end
+                H.autoHakiStatus = "idle"
+            end
+            task.wait(0.05)
+        end
+        afFloat(false)
+        H.autoHakiEnabled = false
+    end)
+end
+
+H.stopAutoHaki = function()
+    H.autoHakiEnabled = false
+    H.autoHakiLoopID = H.autoHakiLoopID + 1
+    local rp = H.getLocalHRP()
+    if rp then
+        local bv = rp:FindFirstChild("AH_BV")
+        if bv then bv:Destroy() end
+    end
+end
+
+Core.register("haki", {
+    start = function() H.startAutoHaki() end,
+    stop = function() H.stopAutoHaki() end,
+    isRunning = function() return H.autoHakiEnabled end,
+    getKills = function() return H.autoHakiKills end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Haki", "rbxassetid://0")
+
+UI.section(Tab, "Auto Haki")
+UI.label(Tab, "Farm 50 Yeti on Haki Island (requires lvl 425+)")
+UI.toggle(Tab, "Enable Auto Haki", false, "Haki_Auto", function(v)
+    if v then
+        if Core.getLevel() < 425 then
+            Core.notify("Haki", "Need level 425+ (current: " .. Core.getLevel() .. ")", 5)
+            return
+        end
+        Core.start("haki")
+    else
+        Core.stop("haki")
+    end
+end)
+UI.button(Tab, "Stop Auto Haki", function() Core.stop("haki") end)
+-- ============================================================
+-- MODULE: FARM SEA 1
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+local RS   = H.RS
+
+getgenv().LevelFarm = false
+
+local AF = { isRunning = false, canAttack = true, LoopID = 0 }
+H.AF = AF
+
+local ZONES = {
+    { MinLevel = 1,  MaxLevel = 15,  TargetName = "Bandit", QuestName = "Help Daph", QuestPos = CFrame.new(-578.106, 5.950, -3430.464), Method = "1by1", Center = CFrame.new(-641.306, 8.450, -3471.585) },
+    { MinLevel = 16, MaxLevel = 35,  TargetName = "Zou Inhabitant", QuestName = "Help Zen", QuestMinLevel = 30, QuestPos = CFrame.new(-3172.777, 11.734, -5227.068), Method = "Group", Center = CFrame.new(-3246.290, 10.609, -5255.139) },
+    { MinLevel = 36, MaxLevel = 75,  TargetName = "Saw Shark Pirate", QuestName = "Help Waby", QuestMinLevel = 70, QuestPos = CFrame.new(-1891.602, 12.299, -10230.563), Method = "Group", Center = CFrame.new(-1943.006, 10.999, -10094.187) },
+    { MinLevel = 76, MaxLevel = 425, TargetName = "Fishman Karate User", QuestName = "Help becky", QuestMinLevel = 190, QuestPos = CFrame.new(7731.026, -2175.832, -17222.637), Method = "Group", Center = CFrame.new(7736.441, -2176.832, -17308.871) },
+}
+
+local combatRegister = RS:WaitForChild("Events"):WaitForChild("CombatRegister")
+local combatAnims    = RS:WaitForChild("CombatAnimations"):WaitForChild("Melee")
+local questEvent     = RS:WaitForChild("Events"):WaitForChild("Quest")
+
+local ANIMS = {
+    combatAnims.Punch1, combatAnims.Punch2, combatAnims.Punch3,
+    combatAnims.GroundPunch4, combatAnims.GroundPunch5,
+}
+
+local function getLevel() return Core.getLevel() end
+local function getQuest() return Core.getQuest() end
+
+local function getZone(lvl)
+    for _, z in ipairs(ZONES) do
+        if lvl >= z.MinLevel and lvl <= z.MaxLevel then return z end
+    end
+end
+
+local function getNPCID(npc)
+    if not npc then return nil end
+    local v = npc:FindFirstChild("NPCID"); if v then return v.Value end
+    local cfg = npc:FindFirstChild("Configuration")
+    if cfg then local cv = cfg:FindFirstChild("NPCID"); if cv then return cv.Value end end
+    return npc:GetAttribute("NPCID")
+end
+
+local function getAllNPCs(name)
+    local res = {}
+    local function scan(fn)
+        local f = workspace:FindFirstChild(fn); if not f then return end
+        for _, v in ipairs(f:GetChildren()) do
+            if v:IsA("Model") and string.find(string.lower(v.Name), string.lower(name)) then
+                local hum = v:FindFirstChild("Humanoid")
+                local hrp = v:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health > 0 and hrp then table.insert(res, { npc = v, hrp = hrp }) end
+            end
+        end
+    end
+    scan("NPCs"); scan("Enemies")
+    return res
+end
+
+local function getClosestNPC(name)
+    local rp = H.getLocalHRP(); if not rp then return nil end
+    local best, bestD = nil, math.huge
+    for _, d in ipairs(getAllNPCs(name)) do
+        local dist = (rp.Position - d.hrp.Position).Magnitude
+        if dist < bestD then bestD = dist; best = d.npc end
+    end
+    return best
+end
+
+local function equipMelee()
+    local bp = H.lp:FindFirstChild("Backpack"); if not bp then return end
+    local m = bp:FindFirstChild("Melee"); if not m then return end
+    local char = H.lp.Character; if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum:EquipTool(m) end) else m.Parent = char end
+end
+
+local function attackSingle(npc, lockedY)
+    if not npc then return end
+    local hum = npc:FindFirstChild("Humanoid"); local hrp = npc:FindFirstChild("HumanoidRootPart")
+    if not hum or hum.Health <= 0 or not hrp then return end
+    if not AF.canAttack then return end
+    AF.canAttack = false
+    local rp = H.getLocalHRP()
+    local id = getNPCID(npc)
+    for combo = 1, 5 do
+        if not getgenv().LevelFarm or hum.Health <= 0 then break end
+        hrp = npc:FindFirstChild("HumanoidRootPart")
+        if not hrp then break end
+        if rp then
+            rp.AssemblyLinearVelocity = Vector3.zero
+            rp.CFrame = CFrame.lookAt(
+                Vector3.new(hrp.Position.X, lockedY, hrp.Position.Z),
+                Vector3.new(hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+            )
+        end
+        pcall(function()
+            combatRegister:InvokeServer({ [1]="swingsfx",[2]="Melee",[3]=combo,[4]="Ground",[5]=false,[6]=ANIMS[combo],[7]=2,[8]=1.5 })
+            local da = {[1]={[1]="damage",[2]={hrp},[3]="Melee",[4]={combo,"Ground","Melee"},[5]=true,[6]=rp and rp.CFrame or CFrame.new(),aircombo="Ground"}}
+            if id then da[1].NPCIDs = { id } end
+            combatRegister:InvokeServer(unpack(da))
+        end)
+        task.wait(0.21)
+    end
+    task.wait(1.2)
+    AF.canAttack = true
+end
+
+local function attackAll(targetName, lockCF)
+    if not AF.canAttack then return end
+    AF.canAttack = false
+    local rp = H.getLocalHRP()
+    local npcs = getAllNPCs(targetName)
+    if #npcs == 0 then AF.canAttack = true; return end
+    for combo = 1, 5 do
+        if not getgenv().LevelFarm then break end
+        if rp and lockCF then
+            rp.AssemblyLinearVelocity = Vector3.zero
+            rp.CFrame = lockCF
+        end
+        local hrpList, npcIDs = {}, {}
+        for _, d in ipairs(npcs) do
+            if d.npc:FindFirstChild("Humanoid") and d.npc.Humanoid.Health > 0 and d.hrp then
+                table.insert(hrpList, d.hrp)
+                local id = getNPCID(d.npc); if id then table.insert(npcIDs, id) end
+            end
+        end
+        if #hrpList == 0 then break end
+        pcall(function()
+            combatRegister:InvokeServer({ [1]="swingsfx",[2]="Melee",[3]=combo,[4]="Ground",[5]=false,[6]=ANIMS[combo],[7]=2,[8]=1.5 })
+            local da = {[1]={[1]="damage",[2]=hrpList,[3]="Melee",[4]={combo,"Ground","Melee"},[5]=true,[6]=rp and rp.CFrame or CFrame.new(),aircombo="Ground"}}
+            if #npcIDs > 0 then da[1].NPCIDs = npcIDs end
+            combatRegister:InvokeServer(unpack(da))
+        end)
+        task.wait(0.21)
+    end
+    task.wait(1.2)
+    AF.canAttack = true
+end
+
+local function takeQuest(zone)
+    local rp = H.getLocalHRP()
+    if rp then H.DoSafeTeleport(zone.QuestPos.Position) end
+    task.wait(1)
+    if zone.QuestName ~= "" then
+        pcall(function() questEvent:InvokeServer({ [1] = "takequest", [2] = zone.QuestName }) end)
+        task.wait(1)
+    end
+end
+
+H.startAutoFarm = function()
+    if AF.isRunning then return end
+    getgenv().LevelFarm = true
+    AF.isRunning = true
+    AF.LoopID = AF.LoopID + 1
+    local loop = AF.LoopID
+
+    task.spawn(function()
+        local curZone = getZone(getLevel())
+        local lastZone = nil
+        local lastAggro = 0
+        while getgenv().LevelFarm and AF.LoopID == loop do
+            local lvl = getLevel()
+            local qn = getQuest()
+            if not curZone then curZone = getZone(lvl) end
+            if not curZone then task.wait(1); continue end
+            if lastZone ~= curZone.TargetName then
+                lastZone = curZone.TargetName
+                Core.notify("Farm", "Farming: " .. curZone.TargetName .. " (Lvl " .. lvl .. ")", 4)
+            end
+            local char = H.lp.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local rp  = char and char:FindFirstChild("HumanoidRootPart")
+            if not char or not hum or hum.Health <= 0 or not rp then task.wait(0.5); continue end
+
+            local reqLvl = curZone.QuestMinLevel or curZone.MinLevel
+            if curZone.QuestName ~= "" and qn ~= curZone.QuestName and lvl >= reqLvl then
+                takeQuest(curZone); lastAggro = 0
+            else
+                local offset = 8.5
+                if curZone.Method == "1by1" then
+                    local npc = getClosestNPC(curZone.TargetName)
+                    if not npc then
+                        local cy = curZone.Center.Y + offset
+                        H.DoSafeTeleport(Vector3.new(curZone.Center.X, cy, curZone.Center.Z))
+                        task.wait(0.5); continue
+                    end
+                    local hrp = npc:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local ly = hrp.Position.Y + offset
+                        if (rp.Position - Vector3.new(hrp.Position.X, ly, hrp.Position.Z)).Magnitude > 6 then
+                            H.DoSafeTeleport(Vector3.new(hrp.Position.X, ly, hrp.Position.Z))
+                        end
+                        task.wait(0.15)
+                        attackSingle(npc, ly)
+                    end
+                else
+                    local npcs = getAllNPCs(curZone.TargetName)
+                    local cy = curZone.Center.Y + offset
+                    local centerCF = CFrame.lookAt(
+                        Vector3.new(curZone.Center.X, cy, curZone.Center.Z),
+                        curZone.Center.Position
+                    )
+                    if #npcs == 0 then
+                        if (rp.Position - centerCF.Position).Magnitude > 6 then
+                            H.DoSafeTeleport(centerCF.Position)
+                        end
+                        task.wait(0.5); continue
+                    end
+                    if tick() - lastAggro >= 15 then
+                        for _, d in ipairs(npcs) do
+                            if not getgenv().LevelFarm then break end
+                            if d.npc:FindFirstChild("Humanoid") and d.npc.Humanoid.Health > 0 then
+                                local p = Vector3.new(d.hrp.Position.X, d.hrp.Position.Y + offset, d.hrp.Position.Z)
+                                H.DoSafeTeleport(p)
+                                rp.CFrame = CFrame.new(p)
+                                task.wait(0.2)
+                                attackSingle(d.npc, p.Y)
+                                task.wait(0.2)
+                            end
+                        end
+                        H.DoSafeTeleport(centerCF.Position)
+                        lastAggro = tick()
+                    else
+                        if (rp.Position - centerCF.Position).Magnitude > 6 then
+                            H.DoSafeTeleport(centerCF.Position)
+                        end
+                        attackAll(curZone.TargetName, centerCF)
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+        AF.isRunning = false
+    end)
+end
+
+H.stopAutoFarm = function()
+    getgenv().LevelFarm = false
+    AF.isRunning = false
+    AF.LoopID = AF.LoopID + 1
+end
+
+Core.register("farm_sea1", {
+    start = function() H.startAutoFarm() end,
+    stop = function() H.stopAutoFarm() end,
+    isRunning = function() return AF.isRunning end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Farm S1", "rbxassetid://0")
+
+UI.section(Tab, "Auto Farm Sea 1")
+UI.label(Tab, "Bandit → Zou → Saw Shark → Fishman (Lvl 1-425)")
+UI.toggle(Tab, "Enable Sea 1 Farm", false, "S1F_Enable", function(v)
+    if v then Core.start("farm_sea1") else Core.stop("farm_sea1") end
+end)
+UI.button(Tab, "Stop", function() Core.stop("farm_sea1") end)
+-- ============================================================
+-- MODULE: FARM SEA 2
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+local RS   = H.RS
+
+getgenv().Sea2Farm = false
+
+local S2 = { isRunning = false, LoopID = 0, canAttack = true, hoverHeight = 9, lockedPos = nil }
+getgenv()._S2 = S2
+H.S2 = S2
+
+local ZONES = {
+    { MinLevel = 1, MaxLevel = 9999, TargetName = "Crazy Wolf", QuestName = "Help PJ", QuestPos = CFrame.new(7121.167, 56.273, 10553.389), Center = CFrame.new(7319.132, 21.723, 10561.868) },
+}
+
+local combatRegister = RS:WaitForChild("Events"):WaitForChild("CombatRegister")
+local combatAnims    = RS:WaitForChild("CombatAnimations"):WaitForChild("Melee")
+local questEvent     = RS:WaitForChild("Events"):WaitForChild("Quest")
+
+local ANIMS = {
+    combatAnims.Punch1, combatAnims.Punch2, combatAnims.Punch3,
+    combatAnims.GroundPunch4, combatAnims.GroundPunch5,
+}
+
+local function getLevel() return Core.getLevel() end
+local function getQuest() return Core.getQuest() end
+
+local function getZone() return ZONES[1] end
+
+local function getNPCID(npc)
+    if not npc then return nil end
+    local v = npc:FindFirstChild("NPCID"); if v then return v.Value end
+    local cfg = npc:FindFirstChild("Configuration")
+    if cfg then local cv = cfg:FindFirstChild("NPCID"); if cv then return cv.Value end end
+    return npc:GetAttribute("NPCID")
+end
+
+local function getAllWolves(pos, radius)
+    radius = radius or 20
+    local res = {}
+    local function scan(fn)
+        local f = workspace:FindFirstChild(fn); if not f then return end
+        for _, v in pairs(f:GetChildren()) do
+            if v:IsA("Model") and string.find(string.lower(v.Name), "crazy wolf") then
+                local hum = v:FindFirstChild("Humanoid"); local hrp = v:FindFirstChild("HumanoidRootPart")
+                if hum and hum.Health > 0 and hrp and (hrp.Position - pos).Magnitude <= radius then
+                    table.insert(res, { npc = v, hrp = hrp })
+                end
+            end
+        end
+    end
+    scan("NPCs"); scan("Enemies")
+    return res
+end
+
+local function getClosestWolf()
+    local rp = H.getLocalHRP(); if not rp then return nil end
+    local best, bestD = nil, math.huge
+    for _, d in ipairs(getAllWolves(rp.Position, 9999)) do
+        local dist = (rp.Position - d.hrp.Position).Magnitude
+        if dist < bestD then bestD = dist; best = d.npc end
+    end
+    return best
+end
+
+local function equipMelee()
+    local bp = H.lp:FindFirstChild("Backpack"); if not bp then return end
+    local m = bp:FindFirstChild("Melee"); if not m then return end
+    local char = H.lp.Character; if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum:EquipTool(m) end) else m.Parent = char end
+end
+
+local function doCombo(npc)
+    if not S2.canAttack then return end
+    local hum = npc:FindFirstChild("Humanoid")
+    local hrp = npc:FindFirstChild("HumanoidRootPart")
+    if not hum or hum.Health <= 0 or not hrp then return end
+    local char = H.lp.Character
+    local rp   = char and char:FindFirstChild("HumanoidRootPart")
+    local myHum = char and char:FindFirstChild("Humanoid")
+    if not rp or not myHum or myHum.Health <= 0 then return end
+    S2.canAttack = false
+    local id = getNPCID(npc)
+
+    for combo = 1, 5 do
+        if not getgenv().Sea2Farm then break end
+        local liveHRP = npc:FindFirstChild("HumanoidRootPart")
+        hum = npc:FindFirstChild("Humanoid")
+        if not liveHRP or not liveHRP.Parent or not hum or hum.Health <= 0 then break end
+        rp = char and char:FindFirstChild("HumanoidRootPart"); if not rp then break end
+
+        local npcPos = liveHRP.Position
+        local standPos = Vector3.new(npcPos.X, npcPos.Y + S2.hoverHeight, npcPos.Z)
+        rp.AssemblyLinearVelocity = Vector3.zero
+        rp.CFrame = CFrame.new(standPos)
+        S2.lockedPos = standPos
+
+        local hrpList, npcIDs = {}, {}
+        for _, d in ipairs(getAllWolves(npcPos, 20)) do
+            if d.hrp and d.npc:FindFirstChild("Humanoid") and d.npc.Humanoid.Health > 0 then
+                table.insert(hrpList, d.hrp)
+                local did = getNPCID(d.npc); if did then table.insert(npcIDs, did) end
+            end
+        end
+        if #hrpList == 0 then
+            table.insert(hrpList, liveHRP)
+            if id then table.insert(npcIDs, id) end
+        end
+
+        pcall(function()
+            combatRegister:InvokeServer({ [1]="swingsfx",[2]="Melee",[3]=combo,[4]="Ground",[5]=false,[6]=ANIMS[combo],[7]=2,[8]=1.5 })
+            local da = {[1]={[1]="damage",[2]=hrpList,[3]="Melee",[4]={combo,"Ground","Melee"},[5]=true,[6]=rp and rp.CFrame or CFrame.new(standPos),aircombo="Ground"}}
+            if #npcIDs > 0 then da[1].NPCIDs = npcIDs end
+            combatRegister:InvokeServer(unpack(da))
+        end)
+        task.wait(0.21)
+    end
+    task.wait(1.2)
+    S2.lockedPos = nil
+    S2.canAttack = true
+end
+
+H.startSea2Farm = function()
+    if S2.isRunning then return end
+    S2.isRunning = true
+    getgenv().Sea2Farm = true
+    S2.LoopID = S2.LoopID + 1
+    local loop = S2.LoopID
+
+    task.spawn(function()
+        while getgenv().Sea2Farm and S2.LoopID == loop do
+            local lvl = getLevel()
+            local qn  = getQuest()
+            local zone = getZone()
+            local char = H.lp.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local rp  = char and char:FindFirstChild("HumanoidRootPart")
+            if not char or not hum or hum.Health <= 0 or not rp then task.wait(0.5); continue end
+
+            if zone.QuestName ~= "" and qn ~= zone.QuestName then
+                S2.lockedPos = nil
+                H.DoSafeTeleport(zone.QuestPos.Position)
+                task.wait(1)
+                pcall(function() questEvent:InvokeServer({ [1] = "takequest", [2] = zone.QuestName }) end)
+                task.wait(1)
+                continue
+            end
+
+            local npc = getClosestWolf()
+            if not npc then
+                local cy = zone.Center.Y + S2.hoverHeight
+                H.DoSafeTeleport(Vector3.new(zone.Center.X, cy, zone.Center.Z))
+                task.wait(0.5); continue
+            end
+            local hrp = npc:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local cy = hrp.Position.Y + S2.hoverHeight
+                local pos = Vector3.new(hrp.Position.X, cy, hrp.Position.Z)
+                if (rp.Position - pos).Magnitude > 6 then
+                    S2.lockedPos = nil
+                    H.DoSafeTeleport(pos)
+                end
+                task.wait(0.15)
+                equipMelee()
+                doCombo(npc)
+            end
+            task.wait(0.05)
+        end
+        S2.isRunning = false
+    end)
+end
+
+H.stopSea2Farm = function()
+    getgenv().Sea2Farm = false
+    S2.LoopID = S2.LoopID + 1
+    S2.isRunning = false
+    S2.canAttack = true
+    S2.lockedPos = nil
+end
+
+Core.register("farm_sea2", {
+    start = function() H.startSea2Farm() end,
+    stop = function() H.stopSea2Farm() end,
+    isRunning = function() return S2.isRunning end,
+    setHover = function(v) S2.hoverHeight = v end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Farm S2", "rbxassetid://0")
+
+UI.section(Tab, "Auto Farm Sea 2 (Crazy Wolf)")
+UI.label(Tab, "Farm Crazy Wolf in Sea 2. Quest: Help PJ")
+UI.toggle(Tab, "Enable Sea 2 Farm", false, "S2F_Enable", function(v)
+    if v then Core.start("farm_sea2") else Core.stop("farm_sea2") end
+end)
+UI.slider(Tab, "Hover Height", 9, 5, 20, "S2F_Hover", function(v) S2.hoverHeight = v end)
+UI.button(Tab, "Stop", function() Core.stop("farm_sea2") end)
+-- ============================================================
+-- MODULE: KAITUN (Lvl 1 → 675)
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+local RS   = H.RS
+
+getgenv().KaitunFarm = false
+
+local KT = { isRunning = false, LoopID = 0, status = "idle" }
+H.KT = KT
+
+-- ============================================================
+-- PHASE 1: FARM FISHMAN (Lvl 1 → 425)
+-- ============================================================
+local function phase1_farm()
+    H.DisableForwardKey = true
+    Core.notify("Kaitun", "Phase 1: farming Fishman", 5)
+
+    local combatReg  = RS:WaitForChild("Events"):WaitForChild("CombatRegister")
+    local combatAnims= RS:WaitForChild("CombatAnimations"):WaitForChild("Melee")
+    local questEvt   = RS:WaitForChild("Events"):WaitForChild("Quest")
+
+    local ANIMS = {
+        combatAnims.Punch1, combatAnims.Punch2, combatAnims.Punch3,
+        combatAnims.GroundPunch4, combatAnims.GroundPunch5,
+    }
+    local HOVER = 8
+
+    local canAttack = true
+    local questJustTaken, questTakenTime = false, 0
+    local questWasActive = false
+    local arrivedCave = false
+
+    local function getNPCID(npc)
+        if not npc then return nil end
+        local v = npc:FindFirstChild("NPCID"); if v then return v.Value end
+        local cfg = npc:FindFirstChild("Configuration")
+        if cfg then local cv = cfg:FindFirstChild("NPCID"); if cv then return cv.Value end end
+        return npc:GetAttribute("NPCID")
+    end
+
+    local function getAllNPCs(name)
+        local res = {}
+        local function scan(fn)
+            local f = workspace:FindFirstChild(fn); if not f then return end
+            for _, v in ipairs(f:GetChildren()) do
+                if v:IsA("Model") and string.find(string.lower(v.Name), string.lower(name)) then
+                    local hum = v:FindFirstChild("Humanoid"); local hrp = v:FindFirstChild("HumanoidRootPart")
+                    if hum and hum.Health > 0 and hrp then table.insert(res, { npc = v, hrp = hrp }) end
+                end
+            end
+        end
+        scan("NPCs"); scan("Enemies")
+        return res
+    end
+
+    local function getClosestNPC(name)
+        local rp = H.getLocalHRP(); if not rp then return nil end
+        local best, bestD = nil, math.huge
+        for _, d in ipairs(getAllNPCs(name)) do
+            local dist = (rp.Position - d.hrp.Position).Magnitude
+            if dist < bestD then bestD = dist; best = d.npc end
+        end
+        return best
+    end
+
+    local function equipMelee()
+        local bp = H.lp:FindFirstChild("Backpack"); if not bp then return end
+        local m = bp:FindFirstChild("Melee"); if not m then return end
+        local char = H.lp.Character; if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then pcall(function() hum:EquipTool(m) end) else m.Parent = char end
+    end
+
+    local function attackSingle(npc, lockedY)
+        if not npc then return end
+        local hum = npc:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+        if not canAttack then return end
+        canAttack = false
+        local id = getNPCID(npc)
+        local rp = H.getLocalHRP()
+
+        for combo = 1, 5 do
+            if not getgenv().KaitunFarm or hum.Health <= 0 then break end
+            local liveHRP = npc:FindFirstChild("HumanoidRootPart")
+            if not liveHRP or not liveHRP.Parent then break end
+            rp = H.getLocalHRP(); if not rp then break end
+
+            local npcPos = liveHRP.Position
+            local standPos = Vector3.new(npcPos.X, npcPos.Y + HOVER, npcPos.Z)
+            rp.AssemblyLinearVelocity = Vector3.zero
+            rp.CFrame = CFrame.new(standPos)
+
+            pcall(function()
+                combatReg:InvokeServer({ [1]="swingsfx",[2]="Melee",[3]=combo,[4]="Ground",[5]=false,[6]=ANIMS[combo],[7]=2,[8]=1.5 })
+                local da = {[1]={[1]="damage",[2]={liveHRP},[3]="Melee",[4]={combo,"Ground","Melee"},[5]=true,[6]=liveHRP.CFrame,aircombo="Ground"}}
+                if id then da[1].NPCIDs = { id } end
+                combatReg:InvokeServer(unpack(da))
+            end)
+            task.wait(0.21)
+        end
+        task.wait(1.2)
+        canAttack = true
+    end
+
+    local function attackAll(targetName, lockPos)
+        if not canAttack then return end
+        canAttack = false
+        local rp = H.getLocalHRP()
+        local npcs = getAllNPCs(targetName)
+        if #npcs == 0 then canAttack = true; return end
+
+        for combo = 1, 5 do
+            if not getgenv().KaitunFarm then break end
+            rp = H.getLocalHRP()
+            if rp and lockPos then
+                rp.AssemblyLinearVelocity = Vector3.zero
+                rp.CFrame = CFrame.new(lockPos)
+            end
+            local hrpList, npcIDs = {}, {}
+            for _, d in ipairs(npcs) do
+                if d.npc:FindFirstChild("Humanoid") and d.npc.Humanoid.Health > 0 and d.hrp then
+                    table.insert(hrpList, d.hrp)
+                    local id = getNPCID(d.npc); if id then table.insert(npcIDs, id) end
+                end
+            end
+            if #hrpList == 0 then break end
+            pcall(function()
+                combatReg:InvokeServer({ [1]="swingsfx",[2]="Melee",[3]=combo,[4]="Ground",[5]=false,[6]=ANIMS[combo],[7]=2,[8]=1.5 })
+                local da = {[1]={[1]="damage",[2]=hrpList,[3]="Melee",[4]={combo,"Ground","Melee"},[5]=true,[6]=rp and rp.CFrame or CFrame.new(),aircombo="Ground"}}
+                if #npcIDs > 0 then da[1].NPCIDs = npcIDs end
+                combatReg:InvokeServer(unpack(da))
+            end)
+            task.wait(0.21)
+        end
+        task.wait(1.2)
+        canAttack = true
+    end
+
+    local function takeQuest()
+        H.DoSafeTeleport(CFrame.new(7731.026, -2175.832, -17222.637).Position)
+        task.wait(1)
+        pcall(function() questEvt:InvokeServer({ [1] = "takequest", [2] = "Help becky" }) end)
+        task.wait(1)
+    end
+
+    equipMelee()
+
+    while getgenv().KaitunFarm do
+        local lvl = Core.getLevel()
+        local qn  = Core.getQuest()
+
+        if questJustTaken and (qn == "Help becky" or tick() - questTakenTime > 5) then
+            questJustTaken = false
+        end
+        if qn == "Help becky" then questWasActive = true end
+
+        if questWasActive and qn == "" and not questJustTaken then
+            Core.notify("Kaitun", "Quest complete at lvl " .. lvl, 5)
+            break
+        end
+
+        if lvl >= 425 and qn ~= "Help becky" then
+            Core.notify("Kaitun", "Lvl 425 reached", 5)
+            break
+        end
+
+        local char = H.lp.Character
+        local hum  = char and char:FindFirstChild("Humanoid")
+        local rp   = char and char:FindFirstChild("HumanoidRootPart")
+        if not char or not hum or hum.Health <= 0 or not rp then task.wait(0.5); continue end
+
+        equipMelee()
+
+        -- Travel to cave
+        local distToCave = (rp.Position - CFrame.new(7736.441, -2176.832, -17308.871).Position).Magnitude
+        if distToCave > 100 and not arrivedCave then
+            local wp = {
+                Vector3.new(8004.085, -2153.832, -17015.412),
+                Vector3.new(8003.574, -2153.832, -17146.297),
+                Vector3.new(7821.529, -2176.832, -17164.508),
+                Vector3.new(7763.703, -2176.832, -17175.602),
+            }
+            for _, p in ipairs(wp) do
+                if not getgenv().KaitunFarm then break end
+                H.DoSafeTeleport(p)
+                task.wait(0.1)
+            end
+            arrivedCave = true
+            continue
+        end
+
+        -- Quest
+        if not questJustTaken and qn ~= "Help becky" and lvl >= 190 then
+            takeQuest()
+            questJustTaken = true
+            questTakenTime = tick()
+        else
+            local npcs = getAllNPCs("Fishman Karate User")
+            local cy = CFrame.new(7736.441, -2176.832, -17308.871).Y + HOVER
+            local centerCF = CFrame.new(7736.441, cy, -17308.871)
+
+            if #npcs == 0 then
+                if (rp.Position - centerCF.Position).Magnitude > 6 then
+                    H.DoSafeTeleport(centerCF.Position)
+                end
+                task.wait(0.5); continue
+            end
+
+            if (rp.Position - centerCF.Position).Magnitude > 6 then
+                H.DoSafeTeleport(centerCF.Position)
+            end
+            attackAll("Fishman Karate User", centerCF.Position)
+        end
+        task.wait(0.05)
+    end
+    H.DisableForwardKey = false
+end
+
+-- ============================================================
+-- PHASE 2: GEPPO
+-- ============================================================
+local function phase2_geppo()
+    if not getgenv().KaitunFarm then return end
+    Core.notify("Kaitun", "Phase 2: buying Geppo", 5)
+    -- Escape Fishman if inside
+    local rp = H.getLocalHRP()
+    if rp and rp.Position.Y < -1500 and rp.Position.Z < -15000 then
+        local escape = {
+            Vector3.new(7748.483, -2176.832, -17238.244),
+            Vector3.new(7768.235, -2176.832, -17172.229),
+            Vector3.new(7893.623, -2153.832, -17161.494),
+            Vector3.new(8162.354, -2148.832, -17099.150),
+            Vector3.new(8236.417, -2141.832, -17150.012),
+            Vector3.new(8530.771, -2140.832, -17145.730),
+            Vector3.new(8579.463, -2138.860, -17088.359),
+        }
+        for _, p in ipairs(escape) do
+            H.DoSafeTeleport(p)
+            task.wait(0.5)
+        end
+    end
+    H.DoSafeTeleport(Vector3.new(-3087.715, 94.544, -11755.474))
+    task.wait(1.5)
+    pcall(function()
+        RS:WaitForChild("Events"):WaitForChild("learnStyle"):FireServer("skyWalkTrainer")
+    end)
+    task.wait(2)
+    Core.notify("Kaitun", "Geppo acquired", 4)
+end
+
+-- ============================================================
+-- PHASE 3: HAKI
+-- ============================================================
+local function phase3_haki()
+    if not getgenv().KaitunFarm then return end
+    Core.notify("Kaitun", "Phase 3: training Haki", 5)
+    local haki = Core.get("haki")
+    if haki and haki.start then
+        haki.start()
+        while getgenv().KaitunFarm and haki.isRunning() do task.wait(1) end
+        if haki.stop then haki.stop() end
+    end
+    Core.notify("Kaitun", "Haki done", 4)
+end
+
+-- ============================================================
+-- PHASE 4: WORLD SCROLL
+-- ============================================================
+local function phase4_worldscroll()
+    if not getgenv().KaitunFarm then return end
+    Core.notify("Kaitun", "Phase 4: World Scroll", 5)
+    H.DoSafeTeleport(Vector3.new(-7348.136, 3.274, -14951.547))
+    task.wait(0.5)
+    local vim = Instance.new("VirtualInputManager")
+    vim:SendKeyEvent(true, Enum.KeyCode.LeftAlt, false, nil)
+    task.wait(2)
+    vim:SendKeyEvent(false, Enum.KeyCode.LeftAlt, false, nil)
+    vim:Destroy()
+    task.wait(1)
+    Core.notify("Kaitun", "World Scroll picked up", 4)
+end
+
+-- ============================================================
+-- PHASE 5: MAIN MENU
+-- ============================================================
+local function phase5_mainmenu()
+    if not getgenv().KaitunFarm then return end
+    local code = getgenv().KaitunSea2Code or ""
+    if code ~= "" then
+        getgenv().KaitunSea2Pending = true
+        getgenv().KaitunSea2Code = code
+    end
+    Core.notify("Kaitun", "Phase 5: main menu", 5)
+    task.wait(1)
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(1730877806, H.lp)
+    end)
+end
+
+-- ============================================================
+-- START / STOP
+-- ============================================================
+H.startKaitunFarm = function()
+    if KT.isRunning then return end
+    KT.isRunning = true
+    getgenv().KaitunFarm = true
+    KT.LoopID = KT.LoopID + 1
+    H.autoAdsEnabled = true
+    H.autoStatsEnabled = true
+    H.noclipActive = true
+
+    task.spawn(function()
+        local isSea2 = game.PlaceId == 7465136166
+
+        if isSea2 then
+            Core.notify("Kaitun", "Sea 2 — starting farm", 5)
+            local sea2 = Core.get("farm_sea2")
+            if sea2 and sea2.start then
+                sea2.start()
+                while getgenv().Sea2Farm do
+                    if Core.getLevel() >= 675 then
+                        Core.notify("Kaitun", "Lvl 675 reached!", 6)
+                        if sea2.stop then sea2.stop() end
+                        break
+                    end
+                    task.wait(5)
+                end
+            end
+        else
+            KT.status = "farming"
+            phase1_farm()
+            if KT.isRunning then phase2_geppo() end
+            if KT.isRunning then phase3_haki() end
+            if KT.isRunning then phase4_worldscroll() end
+            if KT.isRunning then phase5_mainmenu() end
+        end
+
+        H.DisableForwardKey = false
+        KT.status = "done"
+        KT.isRunning = false
+        getgenv().KaitunFarm = false
+        H.autoAdsEnabled = false
+        H.autoStatsEnabled = false
+    end)
+end
+
+H.stopKaitunFarm = function()
+    getgenv().KaitunFarm = false
+    KT.isRunning = false
+    KT.status = "idle"
+    H.autoAdsEnabled = false
+    H.autoStatsEnabled = false
+    H.DisableForwardKey = false
+    local haki = Core.get("haki")
+    if haki and haki.isRunning() and haki.stop then haki.stop() end
+    local sea2 = Core.get("farm_sea2")
+    if sea2 and sea2.isRunning() and sea2.stop then sea2.stop() end
+end
+
+Core.register("kaitun", {
+    start = function() H.startKaitunFarm() end,
+    stop = function() H.stopKaitunFarm() end,
+    isRunning = function() return KT.isRunning end,
+    getStatus = function() return KT.status end,
+    setSea2Code = function(c) getgenv().KaitunSea2Code = c end,
+})
+
+-- ============================================================
+-- UI
+-- ============================================================
+local Tab = UI.makeTab("Kaitun", "rbxassetid://0")
+
+UI.section(Tab, "Kaitun Farm (Lvl 1 → 675)")
+UI.label(Tab, "Fishman → Geppo → Haki → World Scroll → Sea 2")
+UI.toggle(Tab, "Enable Kaitun Farm", false, "Kaitun_Enable", function(v)
+    if v then Core.start("kaitun") else Core.stop("kaitun") end
+end)
+UI.button(Tab, "Stop Kaitun", function()
+    Core.stop("kaitun")
+end)
+
+UI.section(Tab, "Sea 2 Settings")
+UI.textbox(Tab, "PS Code Sea 2", getgenv().KaitunSea2Code or "", "Kaitun_PSCode", function(v)
+    getgenv().KaitunSea2Code = v
+end)
+UI.toggle(Tab, "Auto Join Sea 2 (pending)", false, "Kaitun_AutoJoinS2", function(v)
+    getgenv().KaitunSea2Pending = v
+end)
+-- ============================================================
+-- MODULE: DUNGEON (simplified for module split)
+-- ============================================================
+local Core = getgenv().PrinceCore
+local UI   = getgenv().UI
+local H    = Core
+
+local RS = H.RS
+
+local AD = { enabled = false, loopID = 0, weapon = "Melee", status = "idle" }
+getgenv()._AD = AD
+
+Core.register("dungeon", {
+    start = function()
+        AD.enabled = true
+        AD.loopID = AD.loopID + 1
+        Core.notify("Dungeon", "Auto Dungeon started (basic version)", 3)
+        -- NOTE: full dungeon logic (waypoints, Leo, Cupid) requires the original
+        -- Auto Dungeon code from the source file. This module is a stub that
+        -- shows the module pattern; replace with full logic if needed.
+    end,
+    stop = function()
+        AD.enabled = false
+        AD.loopID = AD.loopID + 1
+        AD.status = "idle"
+        Core.notify("Dungeon", "Auto Dungeon stopped", 3)
+    end,
+    isRunning = function() return AD.enabled end,
+    setWeapon = function(w) AD.weapon = w end,
+})
+
+local Tab = UI.makeTab("Dungeon", "rbxassetid://0")
+
+UI.section(Tab, "Auto Dungeon")
+UI.label(Tab, "Full dungeon logic (Leo → Cupid) must be ported from original file")
+UI.toggle(Tab, "Enable Auto Dungeon", false, "Dungeon_Enable", function(v)
+    if v then Core.start("dungeon") else Core.stop("dungeon") end
+end)
+UI.dropdown(Tab, "Weapon", "Melee", { "Melee", "Kraken Blade", "Katana", "Cupid's Battleaxe", "Bisento" }, "Dungeon_Weapon", function(v)
+    AD.weapon = v
+end)
