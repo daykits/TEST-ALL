@@ -1,0 +1,711 @@
+--[[
+    ✨ BEAUTIFUL MENU SCRIPT ✨
+    Author: Custom UI
+    Features: Gradient, Animation, Smooth Toggle, Draggable
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local Player = Players.LocalPlayer
+
+-- ═══════════════════════════════════════════
+-- CẤU HÌNH MÀU SẮC & THEME
+-- ═══════════════════════════════════════════
+local Theme = {
+    Background    = Color3.fromRGB(20, 20, 28),
+    Secondary     = Color3.fromRGB(30, 30, 40),
+    Accent        = Color3.fromRGB(138, 43, 226),   -- Tím
+    Accent2       = Color3.fromRGB(0, 191, 255),    -- Xanh cyan
+    Text          = Color3.fromRGB(240, 240, 245),
+    SubText       = Color3.fromRGB(160, 160, 175),
+    Success       = Color3.fromRGB(0, 220, 130),
+    Danger        = Color3.fromRGB(255, 70, 90),
+    Stroke        = Color3.fromRGB(60, 60, 80),
+    ToggleOn      = Color3.fromRGB(0, 220, 130),
+    ToggleOff     = Color3.fromRGB(50, 50, 65),
+}
+
+-- ═══════════════════════════════════════════
+-- HÀM TIỆN ÍCH
+-- ═══════════════════════════════════════════
+local function Create(className, props)
+    local obj = Instance.new(className)
+    for k, v in pairs(props or {}) do
+        obj[k] = v
+    end
+    return obj
+end
+
+local function Tween(obj, time, props, style, dir)
+    local info = TweenInfo.new(
+        time or 0.25,
+        style or Enum.EasingStyle.Quint,
+        dir or Enum.EasingDirection.Out
+    )
+    local tw = TweenService:Create(obj, info, props)
+    tw:Play()
+    return tw
+end
+
+local function AddCorner(parent, radius)
+    return Create("UICorner", {
+        CornerRadius = UDim.new(0, radius or 8),
+        Parent = parent
+    })
+end
+
+local function AddStroke(parent, color, thickness)
+    return Create("UIStroke", {
+        Color = color or Theme.Stroke,
+        Thickness = thickness or 1,
+        Parent = parent
+    })
+end
+
+local function AddGradient(parent, c1, c2, rotation)
+    return Create("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, c1),
+            ColorSequenceKeypoint.new(1, c2),
+        }),
+        Rotation = rotation or 0,
+        Parent = parent
+    })
+end
+
+-- ═══════════════════════════════════════════
+-- TẠO GUI CHÍNH
+-- ═══════════════════════════════════════════
+local ScreenGui = Create("ScreenGui", {
+    Name = "BeautifulMenu",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    Parent = CoreGui
+})
+
+-- ═══════════════════════════════════════════
+-- MAIN FRAME
+-- ═══════════════════════════════════════════
+local Main = Create("Frame", {
+    Name = "Main",
+    Size = UDim2.new(0, 480, 0, 340),
+    Position = UDim2.new(0.5, -240, 0.5, -170),
+    BackgroundColor3 = Theme.Background,
+    BorderSizePixel = 0,
+    Parent = ScreenGui
+})
+AddCorner(Main, 14)
+local MainStroke = AddStroke(Main, Theme.Accent, 1.5)
+
+-- Viền glow mờ bên ngoài
+local Glow = Create("Frame", {
+    Size = UDim2.new(1, 20, 1, 20),
+    Position = UDim2.new(0, -10, 0, -10),
+    BackgroundColor3 = Theme.Accent,
+    BackgroundTransparency = 0.85,
+    BorderSizePixel = 0,
+    ZIndex = 0,
+    Parent = Main
+})
+AddCorner(Glow, 20)
+
+-- ═══════════════════════════════════════════
+-- HEADER
+-- ═══════════════════════════════════════════
+local Header = Create("Frame", {
+    Name = "Header",
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = Theme.Secondary,
+    BorderSizePixel = 0,
+    Parent = Main
+})
+AddCorner(Header, 14)
+
+-- Che góc dưới header (để header chỉ bo 2 góc trên)
+local HeaderFix = Create("Frame", {
+    Size = UDim2.new(1, 0, 0, 14),
+    Position = UDim2.new(0, 0, 1, -14),
+    BackgroundColor3 = Theme.Secondary,
+    BorderSizePixel = 0,
+    Parent = Header
+})
+
+-- Gradient cho header
+AddGradient(Header, Theme.Accent, Theme.Accent2, 45)
+
+-- Logo & Title
+local Title = Create("TextLabel", {
+    Size = UDim2.new(1, -80, 1, 0),
+    Position = UDim2.new(0, 60, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "✦  BEAUTIFUL MENU",
+    TextColor3 = Theme.Text,
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = Header
+})
+
+local Logo = Create("TextLabel", {
+    Size = UDim2.new(0, 40, 0, 40),
+    Position = UDim2.new(0, 14, 0.5, -20),
+    BackgroundTransparency = 1,
+    Text = "◈",
+    TextColor3 = Theme.Text,
+    Font = Enum.Font.GothamBold,
+    TextSize = 26,
+    Parent = Header
+})
+
+-- Nút đóng
+local CloseBtn = Create("TextButton", {
+    Size = UDim2.new(0, 36, 0, 36),
+    Position = UDim2.new(1, -44, 0.5, -18),
+    BackgroundColor3 = Color3.fromRGB(255, 70, 90),
+    BackgroundTransparency = 0.85,
+    Text = "✕",
+    TextColor3 = Theme.Text,
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    AutoButtonColor = false,
+    Parent = Header
+})
+AddCorner(CloseBtn, 8)
+
+CloseBtn.MouseEnter:Connect(function()
+    Tween(CloseBtn, 0.2, {BackgroundTransparency = 0.4})
+end)
+CloseBtn.MouseLeave:Connect(function()
+    Tween(CloseBtn, 0.2, {BackgroundTransparency = 0.85})
+end)
+CloseBtn.MouseButton1Click:Connect(function()
+    Tween(Main, 0.3, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)})
+    task.wait(0.3)
+    ScreenGui:Destroy()
+end)
+
+-- ═══════════════════════════════════════════
+-- SIDEBAR (Tab buttons)
+-- ═══════════════════════════════════════════
+local Sidebar = Create("Frame", {
+    Size = UDim2.new(0, 140, 1, -62),
+    Position = UDim2.new(0, 8, 0, 54),
+    BackgroundColor3 = Theme.Secondary,
+    BackgroundTransparency = 0.3,
+    BorderSizePixel = 0,
+    Parent = Main
+})
+AddCorner(Sidebar, 10)
+
+local SidebarLayout = Create("UIListLayout", {
+    Padding = UDim.new(0, 6),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    Parent = Sidebar
+})
+Create("UIPadding", {
+    PaddingTop = UDim.new(0, 10),
+    Parent = Sidebar
+})
+
+-- ═══════════════════════════════════════════
+-- CONTENT AREA
+-- ═══════════════════════════════════════════
+local Content = Create("Frame", {
+    Size = UDim2.new(1, -164, 1, -62),
+    Position = UDim2.new(0, 156, 0, 54),
+    BackgroundColor3 = Theme.Secondary,
+    BackgroundTransparency = 0.3,
+    BorderSizePixel = 0,
+    Parent = Main
+})
+AddCorner(Content, 10)
+
+-- ═══════════════════════════════════════════
+-- TẠO TAB SYSTEM
+-- ═══════════════════════════════════════════
+local Tabs = {}
+local ActiveTab = nil
+
+local function CreateTab(name, icon)
+    local Btn = Create("TextButton", {
+        Size = UDim2.new(1, -16, 0, 38),
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.7,
+        Text = "",
+        AutoButtonColor = false,
+        Parent = Sidebar
+    })
+    AddCorner(Btn, 8)
+
+    local IconLbl = Create("TextLabel", {
+        Size = UDim2.new(0, 30, 1, 0),
+        Position = UDim2.new(0, 6, 0, 0),
+        BackgroundTransparency = 1,
+        Text = icon or "•",
+        TextColor3 = Theme.SubText,
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        Parent = Btn
+    })
+
+    local NameLbl = Create("TextLabel", {
+        Size = UDim2.new(1, -36, 1, 0),
+        Position = UDim2.new(0, 32, 0, 0),
+        BackgroundTransparency = 1,
+        Text = name,
+        TextColor3 = Theme.SubText,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Btn
+    })
+
+    -- Trang content riêng
+    local Page = Create("ScrollingFrame", {
+        Size = UDim2.new(1, -20, 1, -20),
+        Position = UDim2.new(0, 10, 0, 10),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = Theme.Accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        Visible = false,
+        Parent = Content
+    })
+    Create("UIListLayout", {
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = Page
+    })
+
+    local tab = { Button = Btn, Page = Page, Icon = IconLbl, Name = NameLbl }
+
+    Btn.MouseButton1Click:Connect(function()
+        if ActiveTab == tab then return end
+        -- Reset tất cả
+        for _, t in pairs(Tabs) do
+            Tween(t.Button, 0.2, {BackgroundTransparency = 0.7, BackgroundColor3 = Theme.Background})
+            Tween(t.Icon, 0.2, {TextColor3 = Theme.SubText})
+            Tween(t.Name, 0.2, {TextColor3 = Theme.SubText})
+            t.Page.Visible = false
+        end
+        -- Active tab
+        Tween(Btn, 0.25, {BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent})
+        Tween(IconLbl, 0.2, {TextColor3 = Theme.Text})
+        Tween(NameLbl, 0.2, {TextColor3 = Theme.Text})
+        Page.Visible = true
+        ActiveTab = tab
+    end)
+
+    Btn.MouseEnter:Connect(function()
+        if ActiveTab ~= tab then
+            Tween(Btn, 0.2, {BackgroundTransparency = 0.4})
+        end
+    end)
+    Btn.MouseLeave:Connect(function()
+        if ActiveTab ~= tab then
+            Tween(Btn, 0.2, {BackgroundTransparency = 0.7})
+        end
+    end)
+
+    table.insert(Tabs, tab)
+    return tab
+end
+
+-- ═══════════════════════════════════════════
+-- TẠO COMPONENTS
+-- ═══════════════════════════════════════════
+
+-- Nút bấm đẹp
+local function CreateButton(parent, text, callback)
+    local Btn = Create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Theme.Accent,
+        Text = "",
+        AutoButtonColor = false,
+        Parent = parent
+    })
+    AddCorner(Btn, 8)
+    AddGradient(Btn, Theme.Accent, Theme.Accent2, 45)
+    local stroke = AddStroke(Btn, Theme.Accent2, 1)
+    stroke.Transparency = 0.5
+
+    local Lbl = Create("TextLabel", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        Parent = Btn
+    })
+
+    Btn.MouseEnter:Connect(function()
+        Tween(Btn, 0.2, {Size = UDim2.new(1, 4, 0, 42)})
+        stroke.Transparency = 0
+    end)
+    Btn.MouseLeave:Connect(function()
+        Tween(Btn, 0.2, {Size = UDim2.new(1, 0, 0, 40)})
+        stroke.Transparency = 0.5
+    end)
+    Btn.MouseButton1Click:Connect(function()
+        Tween(Btn, 0.1, {Size = UDim2.new(0.96, 0, 0, 38)})
+        task.wait(0.1)
+        Tween(Btn, 0.15, {Size = UDim2.new(1, 0, 0, 40)})
+        if callback then callback() end
+    end)
+
+    return Btn
+end
+
+-- Toggle switch
+local function CreateToggle(parent, text, default, callback)
+    local state = default or false
+
+    local Frame = Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 44),
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    AddCorner(Frame, 8)
+
+    local Lbl = Create("TextLabel", {
+        Size = UDim2.new(1, -70, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.Text,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Frame
+    })
+
+    local Switch = Create("Frame", {
+        Size = UDim2.new(0, 46, 0, 24),
+        Position = UDim2.new(1, -58, 0.5, -12),
+        BackgroundColor3 = state and Theme.ToggleOn or Theme.ToggleOff,
+        BorderSizePixel = 0,
+        Parent = Frame
+    })
+    AddCorner(Switch, 12)
+
+    local Knob = Create("Frame", {
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+        BackgroundColor3 = Theme.Text,
+        BorderSizePixel = 0,
+        Parent = Switch
+    })
+    AddCorner(Knob, 9)
+
+    local Hit = Create("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = Frame
+    })
+
+    Hit.MouseButton1Click:Connect(function()
+        state = not state
+        if state then
+            Tween(Switch, 0.2, {BackgroundColor3 = Theme.ToggleOn})
+            Tween(Knob, 0.25, {Position = UDim2.new(1, -21, 0.5, -9)})
+        else
+            Tween(Switch, 0.2, {BackgroundColor3 = Theme.ToggleOff})
+            Tween(Knob, 0.25, {Position = UDim2.new(0, 3, 0.5, -9)})
+        end
+        if callback then callback(state) end
+    end)
+
+    return { Frame = Frame, Set = function(v) 
+        state = v
+        if state then
+            Tween(Switch, 0.2, {BackgroundColor3 = Theme.ToggleOn})
+            Tween(Knob, 0.25, {Position = UDim2.new(1, -21, 0.5, -9)})
+        else
+            Tween(Switch, 0.2, {BackgroundColor3 = Theme.ToggleOff})
+            Tween(Knob, 0.25, {Position = UDim2.new(0, 3, 0.5, -9)})
+        end
+        if callback then callback(state) end
+    end}
+end
+
+-- Slider
+local function CreateSlider(parent, text, min, max, default, callback)
+    local value = default or min
+
+    local Frame = Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 56),
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    AddCorner(Frame, 8)
+
+    local Lbl = Create("TextLabel", {
+        Size = UDim2.new(1, -90, 0, 22),
+        Position = UDim2.new(0, 12, 0, 6),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.Text,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = Frame
+    })
+
+    local ValLbl = Create("TextLabel", {
+        Size = UDim2.new(0, 60, 0, 22),
+        Position = UDim2.new(1, -72, 0, 6),
+        BackgroundTransparency = 1,
+        Text = tostring(value),
+        TextColor3 = Theme.Accent2,
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = Frame
+    })
+
+    local Bar = Create("Frame", {
+        Size = UDim2.new(1, -24, 0, 6),
+        Position = UDim2.new(0, 12, 0, 36),
+        BackgroundColor3 = Theme.ToggleOff,
+        BorderSizePixel = 0,
+        Parent = Frame
+    })
+    AddCorner(Bar, 3)
+
+    local Fill = Create("Frame", {
+        Size = UDim2.new((value - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        Parent = Bar
+    })
+    AddCorner(Fill, 3)
+    AddGradient(Fill, Theme.Accent, Theme.Accent2, 0)
+
+    local Knob = Create("Frame", {
+        Size = UDim2.new(0, 14, 0, 14),
+        Position = UDim2.new((value - min) / (max - min), -7, 0.5, -7),
+        BackgroundColor3 = Theme.Text,
+        BorderSizePixel = 0,
+        Parent = Bar
+    })
+    AddCorner(Knob, 7)
+
+    local dragging = false
+    local function update(input)
+        local pos = math.clamp((input.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+        value = math.floor(min + (max - min) * pos + 0.5)
+        ValLbl.Text = tostring(value)
+        Tween(Fill, 0.05, {Size = UDim2.new(pos, 0, 1, 0)})
+        Tween(Knob, 0.05, {Position = UDim2.new(pos, -7, 0.5, -7)})
+        if callback then callback(value) end
+    end
+
+    Bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            update(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            update(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    return { Frame = Frame, Get = function() return value end }
+end
+
+-- TextBox
+local function CreateTextBox(parent, placeholder, callback)
+    local Box = Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    AddCorner(Box, 8)
+    local stroke = AddStroke(Box, Theme.Stroke, 1)
+
+    local Input = Create("TextBox", {
+        Size = UDim2.new(1, -24, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = placeholder,
+        PlaceholderColor3 = Theme.SubText,
+        TextColor3 = Theme.Text,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        Parent = Box
+    })
+
+    Input.Focused:Connect(function()
+        Tween(stroke, 0.2, {Color = Theme.Accent, Thickness = 1.5})
+    end)
+    Input.FocusLost:Connect(function()
+        Tween(stroke, 0.2, {Color = Theme.Stroke, Thickness = 1})
+        if callback then callback(Input.Text) end
+    end)
+
+    return Input
+end
+
+-- Label / Section
+local function CreateLabel(parent, text)
+    local Lbl = Create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 26),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Theme.SubText,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = parent
+    })
+    return Lbl
+end
+
+-- ═══════════════════════════════════════════
+-- BUILD DEMO TABS
+-- ═══════════════════════════════════════════
+local tabMain = CreateTab("Trang Chủ", "⌂")
+local tabPlayer = CreateTab("Người Chơi", "☺")
+local tabSettings = CreateTab("Cài Đặt", "⚙")
+
+-- === TAB MAIN ===
+CreateLabel(tabMain.Page, "CHỨC NĂNG CHÍNH")
+CreateButton(tabMain.Page, "🚀  Kích Hoạt Script", function()
+    print("Script activated!")
+end)
+CreateButton(tabMain.Page, "⚡  Auto Farm", function()
+    print("Auto farm toggled")
+end)
+CreateToggle(tabMain.Page, "Vô Hạn Máu", false, function(state)
+    print("God mode:", state)
+end)
+CreateToggle(tabMain.Page, "Tốc Độ Nhanh", false, function(state)
+    print("Speed:", state)
+end)
+
+-- === TAB PLAYER ===
+CreateLabel(tabPlayer.Page, "TÙY CHỈNH NHÂN VẬT")
+CreateSlider(tabPlayer.Page, "Tốc Độ Đi", 16, 200, 16, function(v)
+    if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.WalkSpeed = v
+    end
+end)
+CreateSlider(tabPlayer.Page, "Sức Nhảy", 50, 200, 50, function(v)
+    if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.JumpPower = v
+    end
+end)
+CreateTextBox(tabPlayer.Page, "Nhập tên người chơi...", function(text)
+    print("Teleport to:", text)
+end)
+
+-- === TAB SETTINGS ===
+CreateLabel(tabSettings.Page, "CÀI ĐẶT HỆ THỐNG")
+CreateToggle(tabSettings.Page, "Hiệu Ứng Âm Thanh", true, function(s) print("Sound:", s) end)
+CreateToggle(tabSettings.Page, "Hiển Thị FPS", false, function(s) print("FPS:", s) end)
+CreateButton(tabSettings.Page, "🔄  Reset Cài Đặt", function()
+    print("Reset!")
+end)
+
+-- Chọn tab đầu tiên
+if Tabs[1] then
+    Tabs[1].Button:WaitForChild("")  -- không cần
+    task.defer(function()
+        Tabs[1].Button.MouseButton1Click:Fire()
+    end)
+end
+
+-- Kích hoạt tab đầu
+do
+    local first = Tabs[1]
+    Tween(first.Button, 0.25, {BackgroundTransparency = 0, BackgroundColor3 = Theme.Accent})
+    Tween(first.Icon, 0.2, {TextColor3 = Theme.Text})
+    Tween(first.Name, 0.2, {TextColor3 = Theme.Text})
+    first.Page.Visible = true
+    ActiveTab = first
+end
+
+-- ═══════════════════════════════════════════
+-- DRAG MENU
+-- ═══════════════════════════════════════════
+local dragging = false
+local dragStart, startPos
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- ═══════════════════════════════════════════
+-- HIỆU ỨNG XUẤT HIỆN
+-- ═══════════════════════════════════════════
+Main.Size = UDim2.new(0, 0, 0, 0)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Tween(Main, 0.4, {
+    Size = UDim2.new(0, 480, 0, 340),
+    Position = UDim2.new(0.5, -240, 0.5, -170)
+})
+
+-- Pulse stroke hiệu ứng
+task.spawn(function()
+    while ScreenGui.Parent do
+        Tween(MainStroke, 1.2, {Transparency = 0.3})
+        task.wait(1.2)
+        Tween(MainStroke, 1.2, {Transparency = 0})
+        task.wait(1.2)
+    end
+end)
+
+-- Keybind toggle (RightShift)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+print("✨ Menu đã load thành công! Nhấn RightShift để ẩn/hiện.")
