@@ -1,1 +1,732 @@
 
+--[[
+    LETHAL APE - GOLD FARMING HUB
+    Version: 1.0.0
+    Mode: Assist
+    UI: MiniUI (Original Library)
+
+    Features:
+      - Gold ESP
+      - Gold Detector
+      - Distance Display
+      - Nearest Gold Detection
+      - Farming Assistance
+      - Adjustable ESP Range
+      - Clean-up System
+
+    IMPORTANT:
+    This LocalScript is intended for Roblox Studio projects
+    or game environments where you have permission to use it.
+]]
+
+--==================================================
+-- 1. SERVICES
+--==================================================
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--==================================================
+-- 2. LOAD ORIGINAL UI LIBRARY
+--==================================================
+
+local MiniUI = require(
+    ReplicatedStorage:WaitForChild("MiniUI")
+)
+
+local Window = MiniUI:CreateWindow({
+    Title = "LETHAL APE | GOLD HUB",
+    Width = 520,
+    Height = 420
+})
+
+--==================================================
+-- 3. CONFIGURATION
+--==================================================
+
+local Config = {
+    ESPEnabled = false,
+    DetectorEnabled = false,
+
+    ScanRange = 300,
+    ScanInterval = 1,
+
+    GoldTag = "Gold",
+
+    -- Objects with these names can be detected.
+    GoldKeywords = {
+        "gold",
+        "coin",
+        "nugget",
+        "ingot",
+        "bullion"
+    }
+}
+
+--==================================================
+-- 4. RUNTIME VARIABLES
+--==================================================
+
+local GoldObjects = {}
+local ESPObjects = {}
+
+local LastScan = 0
+local Running = true
+
+local Character = LocalPlayer.Character
+local HumanoidRootPart = nil
+
+local function UpdateCharacter()
+    Character = LocalPlayer.Character
+
+    HumanoidRootPart = Character
+        and Character:FindFirstChild("HumanoidRootPart")
+        or nil
+end
+
+UpdateCharacter()
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    UpdateCharacter()
+end)
+
+--==================================================
+-- 5. GOLD IDENTIFICATION
+--==================================================
+
+local function IsGoldObject(Object)
+
+    if not Object then
+        return false
+    end
+
+    -- Preferred method: use CollectionService tags.
+    if CollectionService:HasTag(Object, Config.GoldTag) then
+        return true
+    end
+
+    -- Fallback: detect by object name.
+    local ObjectName = string.lower(Object.Name)
+
+    for _, Keyword in ipairs(Config.GoldKeywords) do
+        if string.find(ObjectName, Keyword, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+--==================================================
+-- 6. OBJECT POSITION
+--==================================================
+
+local function GetObjectPart(Object)
+
+    if Object:IsA("BasePart") then
+        return Object
+    end
+
+    if Object:IsA("Model") then
+
+        if Object.PrimaryPart then
+            return Object.PrimaryPart
+        end
+
+        return Object:FindFirstChildWhichIsA(
+            "BasePart",
+            true
+        )
+    end
+
+    return nil
+end
+
+local function GetObjectPosition(Object)
+
+    if Object:IsA("Model") then
+        return Object:GetPivot().Position
+    end
+
+    if Object:IsA("BasePart") then
+        return Object.Position
+    end
+
+    return nil
+end
+
+local function GetDistance(Position)
+
+    if not HumanoidRootPart or not Position then
+        return math.huge
+    end
+
+    return (HumanoidRootPart.Position - Position).Magnitude
+end
+
+--==================================================
+-- 7. FIND GOLD OBJECTS
+--==================================================
+
+local function ScanGold()
+
+    local FoundObjects = {}
+    local SeenObjects = {}
+
+    if not HumanoidRootPart then
+        return
+    end
+
+    for _, Object in ipairs(Workspace:GetDescendants()) do
+
+        if Object:IsA("Model") or Object:IsA("BasePart") then
+
+            if IsGoldObject(Object) then
+
+                local Root = Object
+
+                -- Avoid detecting the same object twice.
+                if Object:IsA("BasePart") then
+
+                    local ParentModel = Object:FindFirstAncestorOfClass("Model")
+
+                    if ParentModel and IsGoldObject(ParentModel) then
+                        Root = ParentModel
+                    end
+                end
+
+                if not SeenObjects[Root] then
+
+                    SeenObjects[Root] = true
+
+                    local Position = GetObjectPosition(Root)
+
+                    if Position then
+
+                        local Distance = GetDistance(Position)
+
+                        if Distance <= Config.ScanRange then
+
+                            table.insert(FoundObjects, {
+                                Object = Root,
+                                Position = Position,
+                                Distance = Distance
+                            })
+
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    GoldObjects = FoundObjects
+
+    return FoundObjects
+end
+
+--==================================================
+-- 8. ESP CREATION
+--==================================================
+
+local function RemoveESP(Object)
+
+    local Data = ESPObjects[Object]
+
+    if not Data then
+        return
+    end
+
+    if Data.Highlight then
+        Data.Highlight:Destroy()
+    end
+
+    if Data.Billboard then
+        Data.Billboard:Destroy()
+    end
+
+    ESPObjects[Object] = nil
+end
+
+local function CreateESP(Object)
+
+    if ESPObjects[Object] then
+        return
+    end
+
+    local Part = GetObjectPart(Object)
+
+    if not Part then
+        return
+    end
+
+    -- Highlight
+    local Highlight = Instance.new("Highlight")
+
+    Highlight.Name = "GoldHubHighlight"
+    Highlight.Adornee = Object
+    Highlight.FillColor = Color3.fromRGB(255, 190, 30)
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 120)
+    Highlight.FillTransparency = 0.55
+    Highlight.OutlineTransparency = 0
+
+    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    Highlight.Parent = PlayerGui
+
+    -- Billboard
+    local Billboard = Instance.new("BillboardGui")
+
+    Billboard.Name = "GoldHubBillboard"
+    Billboard.Adornee = Part
+    Billboard.Size = UDim2.fromOffset(150, 45)
+    Billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.MaxDistance = Config.ScanRange
+    Billboard.Parent = PlayerGui
+
+    -- Text
+    local Label = Instance.new("TextLabel")
+
+    Label.Size = UDim2.fromScale(1, 1)
+    Label.BackgroundTransparency = 1
+
+    Label.Text = "GOLD"
+    Label.TextColor3 = Color3.fromRGB(255, 205, 55)
+    Label.TextStrokeTransparency = 0.15
+
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 14
+
+    Label.Parent = Billboard
+
+    ESPObjects[Object] = {
+        Highlight = Highlight,
+        Billboard = Billboard,
+        Label = Label
+    }
+end
+
+--==================================================
+-- 9. UPDATE ESP
+--==================================================
+
+local function UpdateESP()
+
+    if not Config.ESPEnabled then
+
+        for Object in pairs(ESPObjects) do
+            RemoveESP(Object)
+        end
+
+        return
+    end
+
+    local CurrentObjects = {}
+
+    for _, Data in ipairs(GoldObjects) do
+
+        local Object = Data.Object
+
+        if Object and Object.Parent then
+
+            local Position = GetObjectPosition(Object)
+
+            if Position then
+
+                local Distance = GetDistance(Position)
+
+                if Distance <= Config.ScanRange then
+
+                    CurrentObjects[Object] = true
+
+                    CreateESP(Object)
+
+                    local ESP = ESPObjects[Object]
+
+                    if ESP then
+
+                        ESP.Label.Text = string.format(
+                            "GOLD | %d studs",
+                            math.floor(Distance)
+                        )
+
+                    end
+                end
+            end
+        end
+    end
+
+    -- Remove outdated ESP objects.
+    for Object in pairs(ESPObjects) do
+
+        if not CurrentObjects[Object] then
+            RemoveESP(Object)
+        end
+    end
+end
+
+--==================================================
+-- 10. GOLD DETECTOR HUD
+--==================================================
+
+local HUD = Instance.new("ScreenGui")
+
+HUD.Name = "LethalApeGoldHUD"
+HUD.ResetOnSpawn = false
+HUD.DisplayOrder = 20
+HUD.Enabled = false
+HUD.Parent = PlayerGui
+
+local DetectorLabel = Instance.new("TextLabel")
+
+DetectorLabel.Name = "DetectorInfo"
+DetectorLabel.Size = UDim2.fromOffset(340, 65)
+DetectorLabel.Position = UDim2.new(0.5, -170, 0, 30)
+
+DetectorLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+DetectorLabel.BackgroundTransparency = 0.15
+
+DetectorLabel.BorderSizePixel = 0
+
+DetectorLabel.TextColor3 = Color3.fromRGB(255, 205, 55)
+DetectorLabel.TextStrokeTransparency = 0.8
+
+DetectorLabel.Font = Enum.Font.GothamBold
+DetectorLabel.TextSize = 14
+
+DetectorLabel.TextWrapped = true
+DetectorLabel.Text = "GOLD DETECTOR | WAITING..."
+
+DetectorLabel.Parent = HUD
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = DetectorLabel
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(255, 190, 40)
+Stroke.Thickness = 1
+Stroke.Parent = DetectorLabel
+
+--==================================================
+-- 11. FIND NEAREST GOLD
+--==================================================
+
+local function GetNearestGold()
+
+    local Nearest = nil
+    local NearestDistance = math.huge
+
+    for _, Data in ipairs(GoldObjects) do
+
+        local Object = Data.Object
+
+        if Object and Object.Parent then
+
+            local Position = GetObjectPosition(Object)
+
+            if Position then
+
+                local Distance = GetDistance(Position)
+
+                if Distance < NearestDistance then
+
+                    NearestDistance = Distance
+
+                    Nearest = {
+                        Object = Object,
+                        Position = Position,
+                        Distance = Distance
+                    }
+
+                end
+            end
+        end
+    end
+
+    return Nearest
+end
+
+--==================================================
+-- 12. DIRECTION ASSIST
+--==================================================
+
+local function GetDirection(Position)
+
+    local Camera = Workspace.CurrentCamera
+
+    if not Camera or not Position then
+        return "UNKNOWN"
+    end
+
+    local ScreenPosition, OnScreen =
+        Camera:WorldToViewportPoint(Position)
+
+    if ScreenPosition.Z <= 0 then
+        return "BEHIND YOU"
+    end
+
+    if not OnScreen then
+
+        if ScreenPosition.X < 0 then
+            return "LEFT"
+        elseif ScreenPosition.X > Camera.ViewportSize.X then
+            return "RIGHT"
+        end
+
+        if ScreenPosition.Y < 0 then
+            return "ABOVE"
+        else
+            return "BELOW"
+        end
+    end
+
+    local Center = Camera.ViewportSize / 2
+
+    local Difference = Vector2.new(
+        ScreenPosition.X - Center.X,
+        ScreenPosition.Y - Center.Y
+    )
+
+    if Difference.Magnitude < 60 then
+        return "AHEAD"
+    end
+
+    if math.abs(Difference.X) > math.abs(Difference.Y) then
+
+        return Difference.X > 0 and "RIGHT" or "LEFT"
+
+    else
+
+        return Difference.Y > 0 and "DOWN" or "UP"
+
+    end
+end
+
+--==================================================
+-- 13. UPDATE DETECTOR
+--==================================================
+
+local function UpdateDetector()
+
+    HUD.Enabled = Config.DetectorEnabled
+
+    if not Config.DetectorEnabled then
+        return
+    end
+
+    local Nearest = GetNearestGold()
+
+    if not Nearest then
+
+        DetectorLabel.Text =
+            "GOLD DETECTOR\nNo gold detected nearby"
+
+        return
+    end
+
+    local Direction = GetDirection(Nearest.Position)
+
+    DetectorLabel.Text = string.format(
+        "GOLD DETECTOR\n%s | %d studs | %s",
+        Nearest.Object.Name,
+        math.floor(Nearest.Distance),
+        Direction
+    )
+end
+
+--==================================================
+-- 14. UI TABS
+--==================================================
+
+local GoldTab = Window:CreateTab("Gold Assist")
+local ESPTab = Window:CreateTab("Gold ESP")
+local SettingsTab = Window:CreateTab("Settings")
+
+--==================================================
+-- 15. GOLD ASSIST TAB
+--==================================================
+
+GoldTab:CreateLabel("LETHAL APE - GOLD ASSIST")
+
+GoldTab:CreateLabel("Find and locate nearby gold objects.")
+
+GoldTab:CreateToggle(
+    "Gold Detector",
+    false,
+    function(Value)
+
+        Config.DetectorEnabled = Value
+
+        HUD.Enabled = Value
+
+        if Value then
+            ScanGold()
+            UpdateDetector()
+        end
+    end
+)
+
+GoldTab:CreateButton(
+    "Scan Gold Now",
+    function()
+
+        ScanGold()
+        UpdateESP()
+        UpdateDetector()
+
+    end
+)
+
+GoldTab:CreateLabel("Direction assistance is displayed on screen.")
+
+--==================================================
+-- 16. GOLD ESP TAB
+--==================================================
+
+ESPTab:CreateLabel("GOLD ESP SETTINGS")
+
+ESPTab:CreateToggle(
+    "Enable Gold ESP",
+    false,
+    function(Value)
+
+        Config.ESPEnabled = Value
+
+        if not Value then
+
+            for Object in pairs(ESPObjects) do
+                RemoveESP(Object)
+            end
+
+        else
+
+            ScanGold()
+            UpdateESP()
+
+        end
+    end
+)
+
+ESPTab:CreateSlider(
+    "ESP Range",
+    50,
+    1000,
+    Config.ScanRange,
+    function(Value)
+
+        Config.ScanRange = Value
+
+        ScanGold()
+        UpdateESP()
+
+    end
+)
+
+--==================================================
+-- 17. SETTINGS TAB
+--==================================================
+
+SettingsTab:CreateLabel("GOLD HUB SETTINGS")
+
+SettingsTab:CreateSlider(
+    "Scan Interval",
+    1,
+    5,
+    Config.ScanInterval,
+    function(Value)
+
+        Config.ScanInterval = Value
+
+    end
+)
+
+SettingsTab:CreateButton(
+    "Refresh Gold Detection",
+    function()
+
+        ScanGold()
+        UpdateESP()
+        UpdateDetector()
+
+    end
+)
+
+SettingsTab:CreateButton(
+    "Clear ESP",
+    function()
+
+        for Object in pairs(ESPObjects) do
+            RemoveESP(Object)
+        end
+
+    end
+)
+
+SettingsTab:CreateButton(
+    "Close Gold Hub",
+    function()
+
+        Running = false
+
+        for Object in pairs(ESPObjects) do
+            RemoveESP(Object)
+        end
+
+        HUD:Destroy()
+        Window:Destroy()
+
+    end
+)
+
+--==================================================
+-- 18. MAIN UPDATE LOOP
+--==================================================
+
+task.spawn(function()
+
+    while Running do
+
+        local CurrentTime = os.clock()
+
+        if CurrentTime - LastScan >= Config.ScanInterval then
+
+            LastScan = CurrentTime
+
+            ScanGold()
+            UpdateESP()
+        end
+
+        UpdateDetector()
+
+        task.wait(0.2)
+    end
+
+end)
+
+--==================================================
+-- 19. CLEANUP
+--==================================================
+
+script.Destroying:Connect(function()
+
+    Running = false
+
+    for Object in pairs(ESPObjects) do
+        RemoveESP(Object)
+    end
+
+    if HUD then
+        HUD:Destroy()
+    end
+
+end)
+
+print("[Lethal Ape Gold Hub] Loaded successfully!")
