@@ -203,7 +203,7 @@ end
 
 --// Main GUI
 ScreenGui = create("ScreenGui", {
-    Name = "NebulaUniversalHub",
+    Name = "CHATGPT",
     ResetOnSpawn = false,
     IgnoreGuiInset = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
