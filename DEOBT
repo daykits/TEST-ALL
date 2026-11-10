@@ -2565,4 +2565,5 @@ end
     })
 ]]
 
+_G.BananaUI = BananaUI
 return BananaUI
