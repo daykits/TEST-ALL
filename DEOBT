@@ -1,1 +1,5918 @@
+-- ============================================================
 
+-- PRINCE HUB | KAITUN ONLY
+
+-- Visible features kept:
+
+--   1) Auto Kaitun
+
+--   2) Kaitun Sea 2 Auto Join PS
+
+-- Everything else from the old hub was removed from the UI.
+
+-- ============================================================
+
+-- DEFAULT SETTINGS
+
+-- You can override these with getgenv().Config before loading the script.
+
+-- ============================================================
+
+local DefaultConfig = {
+
+	MAIN = {
+
+		LEVEL = 675,
+
+		TWEEN_SPEED = 70,
+
+		STAT_CAP = { STRENGTH = 750, DEFENSE = 1275 },
+
+		PS_CODE = {
+
+			["TPclnqbh0u"] = {"impeldowntesting"},
+
+		},
+
+		AUTO_KAITUN = true,
+
+		AUTO_JOIN_SEA2 = true,
+
+		AUTO_REJOIN = true,
+
+		AUTO_HIDE_UI = true,
+
+		-- Après un crash / Fatal Error / 267, Roblox peut auto-rejoin en serveur public.
+
+		-- Le retour main menu ne doit PAS se faire à chaque lancement normal.
+
+		-- Il se fait seulement si le script a marqué qu'un rejoin/crash vient d'arriver.
+
+		FORCE_PRIVATE_SERVER = true,
+
+		FORCE_MAIN_MENU_ON_REJOIN = true,
+
+		STYLE = { Geppo = true },
+
+		HAKI = { Buso = true },
+
+		ITEM = { ["World Scroll"] = true },
+
+	},
+
+	SETTINGS = {
+
+		OPTIMIZATION = {
+
+			FPS_CAP = 0,
+
+			DISABLE3DRENDER = false,
+
+			LOW_GRAPHICS = true,
+
+		},
+
+	},
+
+}
+
+local function deepMergeConfig(base, override)
+
+	if type(base) ~= "table" or type(override) ~= "table" then
+
+		return base
+
+	end
+
+	for key, value in pairs(override) do
+
+		if type(value) == "table" and type(base[key]) == "table" then
+
+			deepMergeConfig(base[key], value)
+
+		else
+
+			base[key] = value
+
+		end
+
+	end
+
+	return base
+
+end
+
+local userConfig = getgenv().Config
+
+if type(userConfig) == "table" then
+
+	deepMergeConfig(DefaultConfig, userConfig)
+
+	local getConfig = userConfig.GET
+
+	if type(getConfig) == "table" then
+
+		if type(getConfig.STYLE) == "table" then
+
+			DefaultConfig.MAIN.STYLE = DefaultConfig.MAIN.STYLE or {}
+
+			deepMergeConfig(DefaultConfig.MAIN.STYLE, getConfig.STYLE)
+
+		end
+
+		if type(getConfig.HAKI) == "table" then
+
+			DefaultConfig.MAIN.HAKI = DefaultConfig.MAIN.HAKI or {}
+
+			deepMergeConfig(DefaultConfig.MAIN.HAKI, getConfig.HAKI)
+
+		end
+
+		if type(getConfig.ITEM) == "table" then
+
+			DefaultConfig.MAIN.ITEM = DefaultConfig.MAIN.ITEM or {}
+
+			deepMergeConfig(DefaultConfig.MAIN.ITEM, getConfig.ITEM)
+
+		end
+
+	end
+
+end
+
+getgenv().Config = DefaultConfig
+
+-- ============================================================
+
+-- SERVICES / PLACE DETECTION
+
+-- ============================================================
+
+local Players            = game:GetService("Players")
+
+local ReplicatedStorage  = game:GetService("ReplicatedStorage")
+
+local RunService         = game:GetService("RunService")
+
+local TeleportService    = game:GetService("TeleportService")
+
+local VirtualUser        = game:GetService("VirtualUser")
+
+local VirtualInput       = game:GetService("VirtualInputManager")
+
+local CoreGui            = game:GetService("CoreGui")
+
+local UserInputService   = game:GetService("UserInputService")
+
+local StarterGui         = game:GetService("StarterGui")
+
+local Lighting           = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+
+local LOGIN_PLACE_ID = 1730877806
+
+local LOGIN_PLACE_ID_2 = 6360478118
+
+local SEA2_PLACE_ID = 7465136166
+
+local IS_LOGIN_PLACE = game.PlaceId == LOGIN_PLACE_ID or game.PlaceId == LOGIN_PLACE_ID_2
+
+local IS_SEA2_PLACE = game.PlaceId == SEA2_PLACE_ID
+
+-- ============================================================
+
+-- CONFIG RESOLUTION
+
+-- ============================================================
+
+local function normalizePSValue(value)
+	return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function normalizePSName(value)
+	return normalizePSValue(value):lower()
+end
+
+local function resolvePSCode()
+	local cfg = DefaultConfig.MAIN
+	local psConfig = cfg.PS_CODE
+	if not psConfig then return "" end
+
+
+	if type(psConfig) == "string" then
+		local directCode = normalizePSValue(psConfig)
+		if directCode == "Public" then return "" end
+		return directCode
+	end
+
+	if type(psConfig) ~= "table" then
+		return ""
+	end
+
+	local myName = normalizePSName(LocalPlayer.Name)
+	local matches = {}
+
+	for psCode, bots in pairs(psConfig) do
+		if type(bots) == "table" then
+			for _, entry in ipairs(bots) do
+				local userName, weapon
+
+				if type(entry) == "string" then
+					userName = entry
+				elseif type(entry) == "table" then
+					userName = entry.user or entry.username or entry.name
+					weapon = entry.weapon
+				end
+
+				if normalizePSName(userName) == myName then
+					local cleanCode = normalizePSValue(psCode)
+					table.insert(matches, {
+						code = cleanCode,
+						weapon = weapon,
+					})
+				end
+			end
+		end
+	end
+
+	if #matches == 0 then
+		return ""
+	end
+
+	-- Si le même username est dans plusieurs PS codes, on évite le hasard de pairs().
+	-- Priorité 1: garder le code déjà actif si c'est un des codes trouvés.
+	local activeCode = normalizePSValue(getgenv().KaitunSea2Code or "")
+	if activeCode ~= "" then
+		for _, match in ipairs(matches) do
+			if match.code == activeCode then
+				if match.weapon then
+					DefaultConfig.MAIN.RESOLVED_WEAPON = match.weapon
+				end
+				if match.code == "Public" then return "" end
+				return match.code
+			end
+		end
+	end
+
+	-- Priorité 2: choisir toujours le même code de façon déterministe.
+	-- Important: le mieux reste quand même de ne pas mettre un username dans 2 PS codes.
+	table.sort(matches, function(a, b)
+		return tostring(a.code) < tostring(b.code)
+	end)
+
+	local chosen = matches[1]
+	DefaultConfig.MAIN.PS_CODE_DUPLICATE_MATCHES = #matches
+	if chosen.weapon then
+		DefaultConfig.MAIN.RESOLVED_WEAPON = chosen.weapon
+	end
+	if chosen.code == "Public" then return "" end
+	return chosen.code
+
+end
+
+DefaultConfig.MAIN.RESOLVED_PS_CODE = resolvePSCode()
+
+local PS_CODE_SAVE_FILE = "PrinceKaitunSea2PSCode.txt"
+
+local REJOIN_MAIN_MENU_FLAG_FILE = "PrinceKaitunForceMainMenuAfterRejoin.txt"
+
+local function readSavedPSCode()
+
+	local ok, result = pcall(function()
+
+		if isfile and readfile and isfile(PS_CODE_SAVE_FILE) then
+
+			return tostring(readfile(PS_CODE_SAVE_FILE) or "")
+
+		end
+
+		return ""
+
+	end)
+
+	if ok then
+
+		return tostring(result or ""):gsub("^%s+", ""):gsub("%s+$", "")
+
+	end
+
+	return ""
+
+end
+
+local function savePSCode(code)
+
+	code = tostring(code or "")
+
+	getgenv().KaitunSea2Code = code
+
+	DefaultConfig.MAIN.RESOLVED_PS_CODE = code
+
+	pcall(function()
+
+		if writefile then
+
+			writefile(PS_CODE_SAVE_FILE, code)
+
+		end
+
+	end)
+
+end
+
+local REJOIN_FLAG_TTL_SECONDS = 90
+
+local function markMainMenuAfterRejoin()
+
+	-- On ne sauvegarde plus "true".
+
+	-- On sauvegarde un timestamp court, sinon le flag peut rester bloque
+
+	-- et renvoyer main menu meme quand tu rejoins normalement ton PS.
+
+	local now = os.time()
+
+	getgenv().KaitunForceMainMenuAfterRejoinAt = now
+
+	pcall(function()
+
+		if writefile then
+
+			writefile(REJOIN_MAIN_MENU_FLAG_FILE, tostring(now))
+
+		end
+
+	end)
+
+end
+
+local function clearMainMenuAfterRejoin()
+
+	getgenv().KaitunForceMainMenuAfterRejoin = nil
+
+	getgenv().KaitunForceMainMenuAfterRejoinAt = nil
+
+	pcall(function()
+
+		if delfile and isfile and isfile(REJOIN_MAIN_MENU_FLAG_FILE) then
+
+			delfile(REJOIN_MAIN_MENU_FLAG_FILE)
+
+		elseif writefile then
+
+			writefile(REJOIN_MAIN_MENU_FLAG_FILE, "")
+
+		end
+
+	end)
+
+end
+
+local function hasMainMenuAfterRejoinFlag()
+
+	local now = os.time()
+
+	local stamp = tonumber(getgenv().KaitunForceMainMenuAfterRejoinAt)
+
+	if not stamp then
+
+		local ok, value = pcall(function()
+
+			if isfile and readfile and isfile(REJOIN_MAIN_MENU_FLAG_FILE) then
+
+				return tostring(readfile(REJOIN_MAIN_MENU_FLAG_FILE) or "")
+
+			end
+
+			return ""
+
+		end)
+
+		if ok then
+
+			stamp = tonumber(tostring(value or ""):match("%d+"))
+
+		end
+
+	end
+
+	-- Ancien bug: le fichier contenait "true" et restait permanent.
+
+	-- Si ce n'est pas un timestamp valide, on le supprime et on n'agit pas.
+
+	if not stamp then
+
+		clearMainMenuAfterRejoin()
+
+		return false
+
+	end
+
+	-- Flag valide uniquement juste apres Fatal Error / 267 / ErrorPrompt.
+
+	-- Si tu relances le script plus tard ou arrives normalement dans ton PS,
+
+	-- il est ignore et supprime.
+
+	if now - stamp > REJOIN_FLAG_TTL_SECONDS then
+
+		clearMainMenuAfterRejoin()
+
+		return false
+
+	end
+
+	return true
+
+end
+
+local function trimString(value)
+
+	return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+
+end
+
+local savedPSCode = readSavedPSCode()
+
+local resolvedConfigPSCode = trimString(DefaultConfig.MAIN.RESOLVED_PS_CODE or "")
+
+local currentSea2Code = trimString(getgenv().KaitunSea2Code or "")
+
+-- IMPORTANT:
+
+-- Avant, la condition `or type(DefaultConfig.MAIN.PS_CODE) == "table"` pouvait
+
+-- forcer KaitunSea2Code = "" quand ton pseudo n'etait pas trouve dans PS_CODE.
+
+-- Maintenant on ne prend le code de config QUE s'il est vraiment resolu.
+
+if resolvedConfigPSCode ~= "" then
+
+	getgenv().KaitunSea2Code = resolvedConfigPSCode
+
+elseif currentSea2Code ~= "" then
+
+	getgenv().KaitunSea2Code = currentSea2Code
+
+elseif savedPSCode ~= "" then
+
+	getgenv().KaitunSea2Code = savedPSCode
+
+else
+
+	getgenv().KaitunSea2Code = ""
+
+end
+
+DefaultConfig.MAIN.RESOLVED_PS_CODE = getgenv().KaitunSea2Code or ""
+
+if DefaultConfig.MAIN.RESOLVED_PS_CODE ~= "" then
+
+	savePSCode(DefaultConfig.MAIN.RESOLVED_PS_CODE)
+
+end
+
+local function getActivePSCode()
+
+	local code = trimString(getgenv().KaitunSea2Code or "")
+
+	if code ~= "" then return code end
+
+	code = trimString(DefaultConfig.MAIN.RESOLVED_PS_CODE or "")
+
+	if code ~= "" then return code end
+
+	return trimString(readSavedPSCode())
+
+end
+
+-- Ne pas utiliser game.PrivateServerId ici.
+
+-- Dans ce jeu / selon le type de serveur, ça peut faire un faux positif
+
+-- et renvoyer au main menu alors que le bot vient d'arriver dans le bon PS.
+
+local function shouldForcePSRoute()
+
+	return DefaultConfig.MAIN.FORCE_PRIVATE_SERVER == true
+
+		and DefaultConfig.MAIN.AUTO_JOIN_SEA2 == true
+
+		and getActivePSCode() ~= ""
+
+end
+
+local function teleportToMainMenuForPS()
+
+	local code = getActivePSCode()
+
+	if code == "" then return false end
+
+	savePSCode(code)
+
+	getgenv().KaitunSea2Code = code
+
+	getgenv().KaitunSea2Pending = true
+
+	pcall(function()
+
+		TeleportService:Teleport(LOGIN_PLACE_ID, LocalPlayer)
+
+	end)
+
+	return true
+
+end
+
+local function shouldForceMainMenuFromCurrentPlace()
+
+	if not shouldForcePSRoute() then return false end
+
+	if DefaultConfig.MAIN.FORCE_MAIN_MENU_ON_REJOIN ~= true then return false end
+
+	if IS_LOGIN_PLACE then return false end
+
+	if not hasMainMenuAfterRejoinFlag() then return false end
+
+	-- Flag one-shot: il sert seulement pour le rejoin juste apres Fatal Error / 267.
+
+	-- On le clear AVANT de partir main menu pour eviter qu'un futur lancement normal
+
+	-- en Sea 1 / Sea 2 prive renvoie encore au main menu.
+
+	clearMainMenuAfterRejoin()
+
+	return true
+
+end
+
+-- ============================================================
+
+-- SMALL UTILS
+
+-- ============================================================
+
+local H = {}
+
+H.teleportSpeed = DefaultConfig.MAIN.TWEEN_SPEED or 70
+
+H.tpToken = 0
+
+H.autoStatsEnabled = false
+
+H.autoAdsEnabled = false
+
+H.noclipActive = false
+
+H.noclipConn = nil
+
+H.utilityLoopsStarted = false
+
+H.optimizationLoopStarted = false
+
+H.autoRejoinStarted = false
+
+H.lowGraphicsConn = nil
+
+H.lastLowGraphicsSweep = 0
+
+H.lowGraphicsInitialSweepDone = false
+
+H.LOW_GRAPHICS_SWEEP_INTERVAL = 30
+
+H.lastNoclipTakeStam = 0
+
+H.fishmanEscaping = false
+
+H.lastDeathTime = 0
+
+H.respawnGraceUntil = 0
+
+H.autoStatsPatternIndex = 1
+
+H.YETI_MIN_SAFE_Y = 45
+
+H.YETI_MAX_SAFE_Y = 220
+
+H.RESPAWN_WAIT_SECONDS = 10
+
+H.HIT_ROTATION_X = 0
+
+-- Combat positionnement Yeti:
+
+-- on reste centre au-dessus du yeti, sans rotation couchÃ©e.
+
+H.YETI_HIT_DISTANCE = 0
+
+H.YETI_HIT_ROTATION_X = 0
+
+H.YETI_HIT_ROTATION_Y = 0
+
+H.YETI_HIT_ROTATION_Z = 0
+
+H.YETI_HOVER_HEIGHT = 8.3
+
+-- Zone "boÃ®te" autour de Yeti Island. Le perso ne peut pas sortir de ces
+
+-- limites pendant la phase Haki â€” utile pour Ã©viter qu'il dÃ©rive vers les
+
+-- arbres/falaises ou tombe dans le vide Ã  cause d'un yeti mal placÃ©.
+
+-- Centre approximatif (farmPos): X = -4395, Z = -2945
+
+-- Ces marges sont volontairement larges pour englober tous les spawns Yeti.
+
+H.YETI_ZONE_MIN_X = -4600
+
+H.YETI_ZONE_MAX_X = -4180
+
+H.YETI_ZONE_MIN_Z = -3160
+
+H.YETI_ZONE_MAX_Z = -2730
+
+H.YETI_ZONE_ENABLED = true
+
+-- Yeti focus Haki: le script choisit uniquement le Yeti le plus proche de ce spot.
+
+-- Ajoute un deuxieme Vector3 dans cette table si tu veux autoriser exactement 2 Yetis.
+
+H.YETI_TARGET_SPOTS = {
+
+	Vector3.new(-4475.706, 80.982, -2964.551),
+
+	Vector3.new(-4453.12158, 55.4073029, -3014.5376),
+
+}
+
+H.YETI_TARGET_MAX_DISTANCE = 35
+
+H.YETI_ABANDON_DISTANCE = 38
+
+H.YETI_ABANDON_Y_DROP = 25
+
+H.HAKI_LOW_HP_THRESHOLD = 100
+
+H.HAKI_LOW_HP_WAIT = 8
+
+-- Vrai si la position donnÃ©e est dans la zone Yeti (X/Z et Y).
+
+local function isInsideYetiZone(pos)
+
+	if typeof(pos) ~= "Vector3" then return false end
+
+	if not H.YETI_ZONE_ENABLED then return true end
+
+	return pos.X >= H.YETI_ZONE_MIN_X and pos.X <= H.YETI_ZONE_MAX_X
+
+		and pos.Z >= H.YETI_ZONE_MIN_Z and pos.Z <= H.YETI_ZONE_MAX_Z
+
+		and pos.Y >= H.YETI_MIN_SAFE_Y and pos.Y <= H.YETI_MAX_SAFE_Y
+
+end
+
+-- Clamp un Vector3 Ã  l'intÃ©rieur de la boÃ®te Yeti.
+
+local function clampToYetiZone(pos)
+
+	if typeof(pos) ~= "Vector3" then return pos end
+
+	if not H.YETI_ZONE_ENABLED then return pos end
+
+	local x = math.clamp(pos.X, H.YETI_ZONE_MIN_X, H.YETI_ZONE_MAX_X)
+
+	local y = math.clamp(pos.Y, H.YETI_MIN_SAFE_Y, H.YETI_MAX_SAFE_Y)
+
+	local z = math.clamp(pos.Z, H.YETI_ZONE_MIN_Z, H.YETI_ZONE_MAX_Z)
+
+	return Vector3.new(x, y, z)
+
+end
+
+local function isFishmanRegionPosition(pos)
+
+	if typeof(pos) ~= "Vector3" then return false end
+
+	-- Fishman cave/island lives very deep under the map around X 7k-8.8k,
+
+	-- Z -17k. Keep this broad so respawn/knockback spots are still detected.
+
+	return pos.Y < -1000
+
+		and pos.X >= 6500 and pos.X <= 9300
+
+		and pos.Z >= -18250 and pos.Z <= -14500
+
+end
+
+local fireTakeStamDash = function() end
+
+local releaseMovementKeys = function() end
+
+LocalPlayer.Idled:Connect(function()
+
+	VirtualUser:CaptureController()
+
+	VirtualUser:ClickButton2(Vector2.new())
+
+end)
+
+local function notify(title, text, duration)
+
+	-- Silent mode: no console prints and no on-screen notifications.
+
+end
+
+local function configFlag(sectionName, keyName, default)
+
+	local getSection = DefaultConfig.GET and DefaultConfig.GET[sectionName]
+
+	if type(getSection) == "table" and getSection[keyName] ~= nil then
+
+		return getSection[keyName] == true
+
+	end
+
+	local section = DefaultConfig.MAIN and DefaultConfig.MAIN[sectionName]
+
+	if type(section) ~= "table" or section[keyName] == nil then
+
+		return default == true
+
+	end
+
+	return section[keyName] == true
+
+end
+
+local function makeObjectLowGraphics(obj)
+
+	pcall(function()
+
+		if obj:IsA("BasePart") then
+
+			obj.Material = Enum.Material.SmoothPlastic
+
+			obj.Reflectance = 0
+
+			obj.CastShadow = false
+
+			if obj:IsA("MeshPart") then
+
+				obj.TextureID = ""
+
+				obj.RenderFidelity = Enum.RenderFidelity.Performance
+
+			end
+
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+
+			obj.Transparency = 1
+
+		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam")
+
+			or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+
+			obj.Enabled = false
+
+		elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+
+			obj.Enabled = false
+
+		elseif obj:IsA("PostEffect") then
+
+			obj.Enabled = false
+
+		elseif obj:IsA("Atmosphere") then
+
+			obj.Density = 0
+
+			obj.Offset = 0
+
+			obj.Haze = 0
+
+			obj.Glare = 0
+
+		elseif obj:IsA("Clouds") then
+
+			obj.Cover = 0
+
+			obj.Density = 0
+
+		end
+
+	end)
+
+end
+
+local function applyLowGraphicsSettings()
+
+	local settings = DefaultConfig.SETTINGS or {}
+
+	local opt = settings.OPTIMIZATION or {}
+
+	if opt.LOW_GRAPHICS ~= true and opt.UGLY_GRAPHICS ~= true then return end
+
+	pcall(function()
+
+		Lighting.GlobalShadows = false
+
+		Lighting.Brightness = 0
+
+		Lighting.EnvironmentDiffuseScale = 0
+
+		Lighting.EnvironmentSpecularScale = 0
+
+		Lighting.FogEnd = 9e9
+
+		Lighting.Technology = Enum.Technology.Compatibility
+
+	end)
+
+	pcall(function()
+
+		local terrain = workspace:FindFirstChild("Terrain")
+
+		if terrain then
+
+			terrain.WaterWaveSize = 0
+
+			terrain.WaterWaveSpeed = 0
+
+			terrain.WaterReflectance = 0
+
+			terrain.WaterTransparency = 1
+
+			terrain.Decoration = false
+
+		end
+
+	end)
+
+	if not H.lowGraphicsConn then
+
+		H.lowGraphicsConn = workspace.DescendantAdded:Connect(function(obj)
+
+			makeObjectLowGraphics(obj)
+
+		end)
+
+	end
+
+	local sweepInterval = H.lowGraphicsInitialSweepDone and (H.LOW_GRAPHICS_SWEEP_INTERVAL or 30) or 0
+
+	if tick() - (H.lastLowGraphicsSweep or 0) >= sweepInterval then
+
+		H.lastLowGraphicsSweep = tick()
+
+		H.lowGraphicsInitialSweepDone = true
+
+		for _, obj in ipairs(workspace:GetDescendants()) do
+
+			makeObjectLowGraphics(obj)
+
+		end
+
+		for _, obj in ipairs(Lighting:GetDescendants()) do
+
+			makeObjectLowGraphics(obj)
+
+		end
+
+	end
+
+end
+
+local function applyOptimizationSettings()
+
+	local settings = DefaultConfig.SETTINGS or {}
+
+	local opt = settings.OPTIMIZATION or {}
+
+	local fpsCap = tonumber(opt.FPS_CAP)
+
+	if fpsCap and fpsCap > 0 then
+
+		pcall(function()
+
+			if type(setfpscap) == "function" then
+
+				setfpscap(fpsCap)
+
+			end
+
+		end)
+
+	end
+
+	pcall(function()
+
+		if RunService.Set3dRenderingEnabled then
+
+			RunService:Set3dRenderingEnabled(opt.DISABLE3DRENDER ~= true)
+
+		end
+
+	end)
+
+	applyLowGraphicsSettings()
+
+end
+
+local function startOptimizationLoop()
+
+	if H.optimizationLoopStarted then return end
+
+	H.optimizationLoopStarted = true
+
+	task.spawn(function()
+
+		while true do
+
+			applyOptimizationSettings()
+
+			task.wait(1)
+
+		end
+
+	end)
+
+end
+
+local function startAutoRejoin()
+
+	if H.autoRejoinStarted or DefaultConfig.MAIN.AUTO_REJOIN ~= true then return end
+
+	H.autoRejoinStarted = true
+
+	local function retryJoin()
+
+		task.wait(2)
+
+		-- Fatal Error / 267 / ErrorPrompt detecte:
+
+		-- On marque le prochain lancement pendant 90 secondes max.
+
+		-- Pas de flag permanent, sinon arrivee normale en PS = faux main menu.
+
+		if shouldForcePSRoute() then
+
+			markMainMenuAfterRejoin()
+
+		end
+
+		TeleportService:Teleport(game.PlaceId, LocalPlayer)
+
+	end
+
+	pcall(function()
+
+		LocalPlayer.OnTeleport:Connect(function(state)
+
+			if state == Enum.TeleportState.Failed then
+
+				retryJoin()
+
+			end
+
+		end)
+
+	end)
+
+	pcall(function()
+
+		local robloxPromptGui = CoreGui:FindFirstChild("RobloxPromptGui")
+
+		local promptOverlay = robloxPromptGui and robloxPromptGui:FindFirstChild("promptOverlay")
+
+		if promptOverlay then
+
+			promptOverlay.ChildAdded:Connect(function(child)
+
+				if child.Name == "ErrorPrompt" then
+
+					retryJoin()
+
+				end
+
+			end)
+
+		end
+
+	end)
+
+end
+
+local function getCharacter()
+
+	local char = LocalPlayer.Character
+
+	if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+
+		return char
+
+	end
+
+	local pc = workspace:FindFirstChild("PlayerCharacters")
+
+	local folderChar = pc and pc:FindFirstChild(LocalPlayer.Name)
+
+	if folderChar and folderChar:FindFirstChild("HumanoidRootPart") and folderChar:FindFirstChildOfClass("Humanoid") then
+
+		return folderChar
+
+	end
+
+	return char or folderChar
+
+end
+
+local function getHRP()
+
+	local char = getCharacter()
+
+	return char and char:FindFirstChild("HumanoidRootPart")
+
+end
+
+local function getHumanoid()
+
+	local char = getCharacter()
+
+	return char and char:FindFirstChildOfClass("Humanoid")
+
+end
+
+local function isAlive()
+
+	local hum = getHumanoid()
+
+	local rp = getHRP()
+
+	return hum and hum.Health > 0 and rp ~= nil
+
+end
+
+local function waitUntilAliveStable(timeout)
+
+	timeout = timeout or 8
+
+	local start = tick()
+
+	while tick() - start < timeout do
+
+		local hum = getHumanoid()
+
+		local rp = getHRP()
+
+		if hum and rp and hum.Health > 0 then
+
+			releaseMovementKeys()
+
+			task.wait(0.45)
+
+			return true
+
+		end
+
+		task.wait(0.2)
+
+	end
+
+	return false
+
+end
+
+local function markDeathGraceIfNeeded()
+
+	local hum = getHumanoid()
+
+	if hum and hum.Health <= 0 then
+
+		H.lastDeathTime = tick()
+
+		H.respawnGraceUntil = tick() + H.RESPAWN_WAIT_SECONDS + 3
+
+		H.tpToken = H.tpToken + 1
+
+		releaseMovementKeys()
+
+		return true
+
+	end
+
+	return false
+
+end
+
+local function getStatsRoot()
+
+	return ReplicatedStorage:FindFirstChild("Stats" .. LocalPlayer.Name)
+
+end
+
+local function getLevel()
+
+	local root = getStatsRoot()
+
+	local lv = root and root:FindFirstChild("Stats") and root.Stats:FindFirstChild("Level")
+
+	return lv and lv.Value or 0
+
+end
+
+local function getQuest()
+
+	local root = getStatsRoot()
+
+	local cq = root and root:FindFirstChild("Quest") and root.Quest:FindFirstChild("CurrentQuest")
+
+	return cq and cq.Value or ""
+
+end
+
+local function getInventoryString()
+
+	local root = getStatsRoot()
+
+	local inv = root and root:FindFirstChild("Inventory")
+
+	if not inv then return "" end
+
+	local ok, value = pcall(function()
+
+		return inv.Value
+
+	end)
+
+	if ok and value ~= nil then
+
+		return tostring(value)
+
+	end
+
+	local parts = {}
+
+	for _, obj in ipairs(inv:GetDescendants()) do
+
+		table.insert(parts, tostring(obj.Name))
+
+		local ok2, v = pcall(function()
+
+			return obj.Value
+
+		end)
+
+		if ok2 and v ~= nil then
+
+			table.insert(parts, tostring(v))
+
+		end
+
+	end
+
+	return table.concat(parts, " ")
+
+end
+
+local function hasInventoryItem(itemName)
+
+	itemName = tostring(itemName or "")
+
+	if itemName == "" then return false end
+
+	local root = getStatsRoot()
+
+	local inv = root and root:FindFirstChild("Inventory")
+
+	if inv then
+
+		if inv:FindFirstChild(itemName, true) then
+
+			return true
+
+		end
+
+		for _, obj in ipairs(inv:GetDescendants()) do
+
+			if tostring(obj.Name):lower() == itemName:lower() then
+
+				return true
+
+			end
+
+			local ok, v = pcall(function()
+
+				return obj.Value
+
+			end)
+
+			if ok and tostring(v):lower():find(itemName:lower(), 1, true) then
+
+				return true
+
+			end
+
+		end
+
+	end
+
+	return string.find(getInventoryString():lower(), itemName:lower(), 1, true) ~= nil
+
+end
+
+local function getHakiQuestProgress(fallbackKills)
+
+	local questName = "Road to Armament"
+
+	local currentQuest = getQuest()
+
+	local maxKills = 50
+
+	local questKills = nil
+
+	local debugSource = nil
+
+	local function scanText(t, sourceName)
+
+		if type(t) ~= "string" or t == "" then return end
+
+		-- Match "X / Y" avec espaces optionnels et n'importe quel suffixe
+
+		-- (ex: "1 / 50 Yeti", "1/50", "Beat Yetis: 1/50").
+
+		local a, b = t:match("(%d+)%s*/%s*(%d+)")
+
+		a, b = tonumber(a), tonumber(b)
+
+		if a and b and b > 0 and b <= 100 then
+
+			local newKills = math.clamp(math.floor(a), 0, b)
+
+			if not questKills or newKills > questKills then
+
+				questKills = newKills
+
+				maxKills = math.clamp(math.floor(b), 1, 100)
+
+				debugSource = sourceName or "?"
+
+			end
+
+		end
+
+	end
+
+	local function scanInstanceText(inst)
+
+		if not inst then return end
+
+		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+
+			scanText(inst.Text, inst:GetFullName())
+
+		end
+
+	end
+
+	-- 1) Source la plus fiable : le GUI de quete PlayerGui.Quest.Main.Misc.
+
+	--    BusoMastery sert d'ancre, et le texte "11 / 50 Yeti" est scanne
+
+	--    dans le meme bloc Quest.
+
+	pcall(function()
+
+		local pg = LocalPlayer:FindFirstChild("PlayerGui")
+
+		if not pg then return end
+
+		local questGui = pg:FindFirstChild("Quest")
+
+		if not questGui then return end
+
+		local main = questGui:FindFirstChild("Main")
+
+		local misc = main and main:FindFirstChild("Misc")
+
+		local busoMastery = misc and misc:FindFirstChild("BusoMastery")
+
+		if misc then
+
+			for _, d in ipairs(misc:GetDescendants()) do
+
+				scanInstanceText(d)
+
+			end
+
+		end
+
+		if main then
+
+			for _, d in ipairs(main:GetDescendants()) do
+
+				scanInstanceText(d)
+
+			end
+
+		end
+
+		if busoMastery then
+
+			scanInstanceText(busoMastery)
+
+			for _, d in ipairs(busoMastery:GetDescendants()) do
+
+				scanInstanceText(d)
+
+			end
+
+		end
+
+		for _, d in ipairs(questGui:GetDescendants()) do
+
+			scanInstanceText(d)
+
+		end
+
+	end)
+
+	-- 2) Fallback : lire le dossier Quest cÃ´tÃ© ReplicatedStorage si le GUI
+
+	--    n'a rien donnÃ©.
+
+	if not questKills then
+
+		local root = getStatsRoot()
+
+		local questFolder = root and root:FindFirstChild("Quest")
+
+		if questFolder then
+
+			for _, obj in ipairs(questFolder:GetDescendants()) do
+
+				if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+
+					local name = string.lower(obj.Name or "")
+
+					local value = tonumber(obj.Value)
+
+					if value then
+
+						if name:find("progress") or name:find("kill") or name:find("count")
+
+							or name:find("amount") or name:find("current") or name == "value" then
+
+							if value >= 0 and value <= 50 then
+
+								questKills = math.max(questKills or 0, math.floor(value))
+
+								debugSource = "RS:" .. obj:GetFullName()
+
+							end
+
+						elseif name:find("required") or name:find("needed") or name:find("need")
+
+							or name:find("max") or name:find("total") or name:find("goal") then
+
+							if value > 0 and value <= 100 then
+
+								maxKills = math.floor(value)
+
+							end
+
+						end
+
+					end
+
+				elseif obj:IsA("StringValue") then
+
+					scanText(tostring(obj.Value or ""), "RS:" .. obj:GetFullName())
+
+				end
+
+			end
+
+		end
+
+	end
+
+	-- 3) Si on n'a rien trouvÃ© cette fois-ci (PlayerGui pas encore prÃªt
+
+	--    juste aprÃ¨s le respawn par exemple), on garde la derniÃ¨re valeur
+
+	--    connue plutÃ´t que de retomber Ã  0.
+
+	if questKills then
+
+		H.lastQuestProgressKills = questKills
+
+		H.lastQuestProgressMax = maxKills
+
+		H.lastQuestProgressSource = debugSource
+
+	else
+
+		if H.lastQuestProgressKills then
+
+			questKills = H.lastQuestProgressKills
+
+			maxKills = H.lastQuestProgressMax or maxKills
+
+			H.lastQuestProgressSource = (H.lastQuestProgressSource or "?") .. " (cached)"
+
+		else
+
+			H.lastQuestProgressSource = nil
+
+		end
+
+	end
+
+	return questKills or fallbackKills or 0, maxKills
+
+end
+
+local function setNoclip(state)
+
+	H.noclipActive = state == true
+
+	if H.noclipActive and not H.noclipConn then
+
+		local cachedChar = nil
+
+		local cachedParts = {}
+
+		local lastCacheTime = 0
+
+		H.noclipConn = RunService.Stepped:Connect(function()
+
+			if not H.noclipActive then return end
+
+			local char = getCharacter()
+
+			if not char then return end
+
+			local now = tick()
+
+			if char ~= cachedChar or now - lastCacheTime >= 2 then
+
+				cachedChar = char
+
+				cachedParts = {}
+
+				lastCacheTime = now
+
+				for _, obj in ipairs(char:GetDescendants()) do
+
+					if obj:IsA("BasePart") then
+
+						table.insert(cachedParts, obj)
+
+					end
+
+				end
+
+			end
+
+			for _, obj in ipairs(cachedParts) do
+
+				if obj and obj.Parent then obj.CanCollide = false end
+
+			end
+
+			if now - (H.lastNoclipTakeStam or 0) >= 0.30 then
+
+				H.lastNoclipTakeStam = now
+
+				fireTakeStamDash()
+
+			end
+
+		end)
+
+	elseif not H.noclipActive and H.noclipConn then
+
+		H.noclipConn:Disconnect()
+
+		H.noclipConn = nil
+
+	end
+
+end
+
+releaseMovementKeys = function()
+
+	pcall(function()
+
+		for _, key in ipairs({
+
+			Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+
+			Enum.KeyCode.Z, Enum.KeyCode.Q,
+
+			Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right,
+
+			}) do
+
+			VirtualInput:SendKeyEvent(false, key, false, game)
+
+		end
+
+	end)
+
+	local hum = getHumanoid()
+
+	local rp = getHRP()
+
+	if hum then
+
+		hum:Move(Vector3.zero, false)
+
+		hum.PlatformStand = false
+
+		hum.Sit = false
+
+		hum.AutoRotate = true
+
+	end
+
+	if rp then
+
+		local bv = rp:FindFirstChild("KT_AirHoldBV")
+
+		if bv then bv:Destroy() end
+
+		local bp = rp:FindFirstChild("KT_AirHoldBP")
+
+		if bp then bp:Destroy() end
+
+		local diveBv = rp:FindFirstChild("KT_WaterDiveBV")
+
+		if diveBv then diveBv:Destroy() end
+
+		rp.AssemblyLinearVelocity = Vector3.zero
+
+		rp.AssemblyAngularVelocity = Vector3.zero
+
+	end
+
+	if hum then
+
+		pcall(function()
+
+			hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+
+		end)
+
+	end
+
+end
+
+fireTakeStamDash = function()
+
+	local events = ReplicatedStorage:FindFirstChild("Events")
+
+	local takestam = events and events:FindFirstChild("takestam")
+
+	local rp = getHRP()
+
+	if not takestam or not rp then return end
+
+	pcall(function()
+
+		takestam:FireServer(1, "dash", rp.CFrame)
+
+	end)
+
+end
+
+local function fireFaceMouse()
+
+	if H.fishmanEscaping then return end
+
+	local rp = getHRP()
+
+	if rp and isFishmanRegionPosition(rp.Position) then return end
+
+	local events = ReplicatedStorage:FindFirstChild("Events")
+
+	local faceMouse = events and events:FindFirstChild("faceMouse")
+
+	if not faceMouse then return end
+
+	pcall(function()
+
+		faceMouse:FireServer(true)
+
+		faceMouse:FireServer(false)
+
+	end)
+
+end
+
+local function shouldUseTravelFaceMouse(startPos, targetPos, noArc)
+
+	if H.fishmanEscaping then
+
+		return false
+
+	end
+
+	if isFishmanRegionPosition(startPos) then
+
+		return false
+
+	end
+
+	if typeof(startPos) ~= "Vector3" or typeof(targetPos) ~= "Vector3" then
+
+		return false
+
+	end
+
+	local dist = (startPos - targetPos).Magnitude
+
+	local yDiff = math.abs(startPos.Y - targetPos.Y)
+
+	return dist >= 400 or yDiff >= 80 or not noArc
+
+end
+
+local function shouldUseTravelArc(startPos, targetPos, noArc)
+
+	if typeof(startPos) ~= "Vector3" or typeof(targetPos) ~= "Vector3" then
+
+		return false
+
+	end
+
+	local dist = (startPos - targetPos).Magnitude
+
+	if dist < 300 then
+
+		return false
+
+	end
+
+	if not noArc then
+
+		return true
+
+	end
+
+	return dist >= 1000 or startPos.Y < -500 or targetPos.Y < -500
+
+end
+
+local function setWaterDiveAssist(rp, hum, enabled, targetY)
+
+	if not rp then return end
+
+	local diveBv = rp:FindFirstChild("KT_WaterDiveBV")
+
+	if enabled then
+
+		if hum then
+
+			pcall(function()
+
+				hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+
+			end)
+
+			pcall(function()
+
+				hum:ChangeState(Enum.HumanoidStateType.Freefall)
+
+			end)
+
+		end
+
+		if not diveBv then
+
+			diveBv = Instance.new("BodyVelocity")
+
+			diveBv.Name = "KT_WaterDiveBV"
+
+			diveBv.Parent = rp
+
+		end
+
+		diveBv.MaxForce = Vector3.new(0, 1e9, 0)
+
+		diveBv.P = 1e7
+
+		diveBv.Velocity = Vector3.new(0, -math.clamp(math.abs(rp.Position.Y - (targetY or rp.Position.Y)) + 20, 35, 140), 0)
+
+	else
+
+		if diveBv then diveBv:Destroy() end
+
+		if hum then
+
+			pcall(function()
+
+				hum:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+
+			end)
+
+		end
+
+	end
+
+end
+
+local function DoSafeTeleport(targetPos, noArc, allowNoclip)
+
+	if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+
+	if typeof(targetPos) ~= "Vector3" then return end
+
+	local rp = getHRP()
+
+	local hum = getHumanoid()
+
+	if not rp or not hum or hum.Health <= 0 then return end
+
+	H.tpToken = H.tpToken + 1
+
+	local myToken = H.tpToken
+
+	local startPos = rp.Position
+
+	local dist = (startPos - targetPos).Magnitude
+
+	local useTravelFaceMouse = shouldUseTravelFaceMouse(startPos, targetPos, noArc)
+
+	local useTravelArc = shouldUseTravelArc(startPos, targetPos, noArc)
+
+	local holdForwardKey = useTravelFaceMouse or useTravelArc
+
+	if allowNoclip == false then
+
+		setNoclip(false)
+
+	else
+
+		setNoclip(true)
+
+	end
+
+	releaseMovementKeys()
+
+	if holdForwardKey then
+
+		pcall(function()
+
+			VirtualInput:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+
+		end)
+
+	end
+
+	local route = {}
+
+	if useTravelArc then
+
+		local safeAlt = math.max(startPos.Y, targetPos.Y) + 2500
+
+		table.insert(route, Vector3.new(startPos.X, safeAlt, startPos.Z))
+
+		table.insert(route, Vector3.new(targetPos.X, safeAlt, targetPos.Z))
+
+		if targetPos.Y < -500 then
+
+			table.insert(route, Vector3.new(targetPos.X, (safeAlt + targetPos.Y) / 2, targetPos.Z))
+
+		end
+
+	end
+
+	table.insert(route, targetPos)
+
+	local floor = Instance.new("Part")
+
+	floor.Name = "KaitunInvisibleFloor"
+
+	floor.Size = Vector3.new(10, 1, 10)
+
+	floor.Transparency = 1
+
+	floor.Anchored = true
+
+	floor.CanCollide = true
+
+	floor.Parent = workspace
+
+	local moving = true
+
+	task.spawn(function()
+
+		local lastFaceMouse = 0
+
+		while moving and H.tpToken == myToken do
+
+			fireTakeStamDash()
+
+			if useTravelFaceMouse and tick() - lastFaceMouse >= 0.10 then
+
+				lastFaceMouse = tick()
+
+				fireFaceMouse()
+
+			end
+
+			task.wait(0.08)
+
+		end
+
+	end)
+
+	for wpIndex, wp in ipairs(route) do
+
+		if useTravelFaceMouse then
+
+			fireFaceMouse()
+
+		end
+
+		while H.tpToken == myToken do
+
+			rp = getHRP()
+
+			hum = getHumanoid()
+
+			if not rp or not hum or hum.Health <= 0 then break end
+
+			local currentDist = (rp.Position - wp).Magnitude
+
+			local isLastWaypoint = wpIndex == #route
+
+			local reachDistance = isLastWaypoint and 2.5 or 15
+
+			local shouldDiveNow = isLastWaypoint and wp.Y < (rp.Position.Y - 4) and (targetPos.Y < 25 or rp.Position.Y < 25)
+
+			setWaterDiveAssist(rp, hum, shouldDiveNow, wp.Y)
+
+			if currentDist <= reachDistance then
+
+				setWaterDiveAssist(rp, hum, false, wp.Y)
+
+				rp.AssemblyLinearVelocity = Vector3.zero
+
+				rp.AssemblyAngularVelocity = Vector3.zero
+
+				break
+
+			end
+
+			local dt = RunService.Heartbeat:Wait()
+
+			local dir = (wp - rp.Position).Unit
+
+			local step = math.min((H.teleportSpeed or 70) * dt, currentDist)
+
+			if useTravelFaceMouse then
+
+				fireFaceMouse()
+
+			end
+
+			rp.CFrame = (rp.CFrame - rp.Position) + (rp.Position + dir * step)
+
+			rp.AssemblyLinearVelocity = Vector3.zero
+
+			rp.AssemblyAngularVelocity = Vector3.zero
+
+			if floor and floor.Parent then
+
+				floor.CFrame = rp.CFrame * CFrame.new(0, -3.1, 0)
+
+			end
+
+		end
+
+	end
+
+	moving = false
+
+	if floor then floor:Destroy() end
+
+	pcall(function()
+
+		local endRp = getHRP()
+
+		local endHum = getHumanoid()
+
+		if endRp then
+
+			setWaterDiveAssist(endRp, endHum, false, targetPos.Y)
+
+		end
+
+	end)
+
+	releaseMovementKeys()
+
+end
+
+local function DoHakiSafeTeleport(targetPos, finalHoverY)
+
+	if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+
+	if typeof(targetPos) ~= "Vector3" then return end
+
+	if tick() < (H.respawnGraceUntil or 0) then
+
+		waitUntilAliveStable(H.RESPAWN_WAIT_SECONDS + 5)
+
+		task.wait(0.5)
+
+	end
+
+	local rp = getHRP()
+
+	local hum = getHumanoid()
+
+	if not rp or not hum or hum.Health <= 0 then return end
+
+	if targetPos.Y < H.YETI_MIN_SAFE_Y then
+
+		targetPos = Vector3.new(targetPos.X, H.YETI_MIN_SAFE_Y + H.YETI_HOVER_HEIGHT, targetPos.Z)
+
+	end
+
+	if finalHoverY and finalHoverY < H.YETI_MIN_SAFE_Y then
+
+		finalHoverY = H.YETI_MIN_SAFE_Y + H.YETI_HOVER_HEIGHT
+
+	end
+
+	setNoclip(true)
+
+	releaseMovementKeys()
+
+	local startPos = rp.Position
+
+	local finalPos = finalHoverY and Vector3.new(targetPos.X, finalHoverY, targetPos.Z) or targetPos
+
+	local flatDist = Vector3.new(targetPos.X - startPos.X, 0, targetPos.Z - startPos.Z).Magnitude
+
+	local yDist = math.abs((finalHoverY or targetPos.Y) - startPos.Y)
+
+	local route = {}
+
+	if flatDist <= 120 and yDist <= 90 then
+
+		table.insert(route, finalPos)
+
+	else
+
+		local safeY = math.max(startPos.Y, targetPos.Y, finalHoverY or targetPos.Y) + 80
+
+		if safeY < 140 then safeY = 140 end
+
+		table.insert(route, Vector3.new(startPos.X, safeY, startPos.Z))
+
+		table.insert(route, Vector3.new(targetPos.X, safeY, targetPos.Z))
+
+		table.insert(route, finalPos)
+
+	end
+
+	for _, wp in ipairs(route) do
+
+		if not getgenv().KaitunFarm then break end
+
+		DoSafeTeleport(wp, true, true)
+
+		task.wait(0.08)
+
+	end
+
+end
+
+-- ============================================================
+
+-- AUTO JOIN PS KAITUN SEA 2
+
+-- ============================================================
+
+local autoJoinRunning = false
+
+local codeSent = false
+
+local function joinOnPrivateServer(targetCode, seaChoice)
+
+	local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+	local chooseTypeRemote = playerGui:FindFirstChild("chooseType")
+
+		and playerGui.chooseType:FindFirstChild("Frame")
+
+		and playerGui.chooseType.Frame:FindFirstChild("RemoteEvent")
+
+	local confirmRemote = playerGui:FindFirstChild("ConfirmationPrompt")
+
+		and playerGui.ConfirmationPrompt:FindFirstChild("RemoteEvent")
+
+	if confirmRemote then
+
+		confirmRemote:FireServer(seaChoice)
+
+		notify("Kaitun Sea 2", seaChoice .. " selected.", 4)
+
+		return "done"
+
+	elseif chooseTypeRemote then
+
+		chooseTypeRemote:FireServer(true)
+
+		notify("Kaitun Sea 2", "Regular clicked. Waiting confirmation...", 3)
+
+		return "waiting_confirm"
+
+	else
+
+		if not codeSent then
+
+			codeSent = true
+
+			task.spawn(function()
+
+				pcall(function()
+
+					ReplicatedStorage:WaitForChild("Events"):WaitForChild("reserved"):InvokeServer(targetCode)
+
+				end)
+
+			end)
+
+			notify("Kaitun Sea 2", "PS code sent. Waiting menu...", 3)
+
+		end
+
+		return "waiting_menu"
+
+	end
+
+end
+
+local function startAutoJoinSea2(code)
+
+	code = trimString(code or getActivePSCode())
+
+	if code == "" then
+
+		notify("Kaitun Sea 2", "No PS code set.", 5)
+
+		return false
+
+	end
+
+	savePSCode(code)
+
+	getgenv().KaitunSea2Code = code
+
+	getgenv().KaitunSea2Pending = true
+
+	if not IS_LOGIN_PLACE then
+
+		notify("Kaitun Sea 2", "Not in main menu. Teleporting main menu first...", 6)
+
+		teleportToMainMenuForPS()
+
+		return true
+
+	end
+
+	autoJoinRunning = true
+
+	codeSent = false
+
+	task.spawn(function()
+
+		while autoJoinRunning do
+
+			if IS_LOGIN_PLACE then
+
+				local result = joinOnPrivateServer(code, "Second Sea")
+
+				if result == "done" then
+
+					autoJoinRunning = false
+
+					codeSent = false
+
+					break
+
+				end
+
+				task.wait(2)
+
+			elseif IS_SEA2_PLACE then
+
+				autoJoinRunning = false
+
+				getgenv().KaitunSea2Pending = false
+
+				if H.startSea2Farm then
+
+					H.startSea2Farm()
+
+				end
+
+				break
+
+			else
+
+				notify("Kaitun Sea 2", "Teleporting main menu first...", 4)
+
+				pcall(function()
+
+					TeleportService:Teleport(LOGIN_PLACE_ID, LocalPlayer)
+
+				end)
+
+				task.wait(5)
+
+			end
+
+		end
+
+	end)
+
+	return true
+
+end
+
+local function stopAutoJoinSea2()
+
+	autoJoinRunning = false
+
+	codeSent = false
+
+	getgenv().KaitunSea2Pending = false
+
+end
+
+-- ============================================================
+
+-- MAIN MENU SAFE MODE
+
+-- ============================================================
+
+startOptimizationLoop()
+
+startAutoRejoin()
+
+-- Crash/Fatal Error/267 fix:
+
+-- Retour main menu SEULEMENT si un ErrorPrompt a pose un timestamp recent.
+
+-- Un ancien flag "true" ou un vieux timestamp est supprime et ignore.
+
+if shouldForceMainMenuFromCurrentPlace() then
+
+	getgenv().PrinceKaitunOnly = H
+
+	teleportToMainMenuForPS()
+
+	return
+
+end
+
+if IS_LOGIN_PLACE then
+
+	clearMainMenuAfterRejoin()
+
+	if DefaultConfig.MAIN.AUTO_JOIN_SEA2 or getgenv().KaitunSea2Pending then
+
+		task.spawn(function()
+
+			task.wait(3)
+
+			startAutoJoinSea2(getActivePSCode())
+
+		end)
+
+	end
+
+	getgenv().PrinceKaitunOnly = H
+
+	return
+
+end
+
+-- ============================================================
+
+-- UTILITY LOOPS: AUTO ADS + AUTO STATS
+
+-- ============================================================
+
+local function startUtilityLoops()
+
+	if H.utilityLoopsStarted then return end
+
+	H.utilityLoopsStarted = true
+
+	task.spawn(function()
+
+		local adEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ADShop")
+
+		while true do
+
+			if H.autoAdsEnabled then
+
+				pcall(function()
+
+					adEvent:FireServer(3457788725, "536248645108658")
+
+				end)
+
+			end
+
+			task.wait(10)
+
+		end
+
+	end)
+
+	task.spawn(function()
+
+		local statsEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("stats")
+
+		while true do
+
+			if H.autoStatsEnabled then
+
+				local root = getStatsRoot()
+
+				local statsFolder = root and root:FindFirstChild("Stats")
+
+				local statPoints = statsFolder and statsFolder:FindFirstChild("SkillPoints")
+
+				if statPoints and statPoints.Value > 0 then
+
+					local pts = statPoints.Value
+
+					local strengthStat = statsFolder and statsFolder:FindFirstChild("Strength")
+
+					local defenseStat = statsFolder and statsFolder:FindFirstChild("Defense")
+
+					local currentStrength = strengthStat and strengthStat.Value or 0
+
+					local currentDefense = defenseStat and defenseStat.Value or 0
+
+					local strCap = (DefaultConfig.MAIN.STAT_CAP and DefaultConfig.MAIN.STAT_CAP.STRENGTH) or 700
+
+					local defCap = (DefaultConfig.MAIN.STAT_CAP and DefaultConfig.MAIN.STAT_CAP.DEFENSE) or 1275
+
+					local statPattern = { "Strength", "Strength", "Defense" }
+
+					for _ = 1, pts do
+
+						if not H.autoStatsEnabled then break end
+
+						local wantedStat = statPattern[H.autoStatsPatternIndex or 1]
+
+						H.autoStatsPatternIndex = (H.autoStatsPatternIndex or 1) % #statPattern + 1
+
+						if wantedStat == "Strength" and currentStrength < strCap then
+
+							pcall(function() statsEvent:FireServer("Strength", nil, 1) end)
+
+							currentStrength = currentStrength + 1
+
+						elseif wantedStat == "Defense" and currentDefense < defCap then
+
+							pcall(function() statsEvent:FireServer("Defense", nil, 1) end)
+
+							currentDefense = currentDefense + 1
+
+						elseif currentStrength < strCap then
+
+							pcall(function() statsEvent:FireServer("Strength", nil, 1) end)
+
+							currentStrength = currentStrength + 1
+
+						elseif currentDefense < defCap then
+
+							pcall(function() statsEvent:FireServer("Defense", nil, 1) end)
+
+							currentDefense = currentDefense + 1
+
+						else
+
+							break
+
+						end
+
+						task.wait(0.03)
+
+					end
+
+				end
+
+			end
+
+			task.wait(1.20)
+
+		end
+
+	end)
+
+end
+
+-- ============================================================
+
+-- COMBAT HELPERS
+
+-- ============================================================
+
+local combatRegister = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CombatRegister")
+
+local questEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Quest")
+
+local combatAnimations = ReplicatedStorage:WaitForChild("CombatAnimations"):WaitForChild("Melee")
+
+local CombatAnims = {
+
+	[1] = combatAnimations.Punch1,
+
+	[2] = combatAnimations.Punch2,
+
+	[3] = combatAnimations.Punch3,
+
+	[4] = combatAnimations.GroundPunch4,
+
+	[5] = combatAnimations.GroundPunch5,
+
+}
+
+local function equipMelee()
+
+	local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+	local char = getCharacter()
+
+	if not backpack or not char then return false end
+
+	if char:FindFirstChild("Melee") then return true end
+
+	local melee = backpack:FindFirstChild("Melee")
+
+	if not melee then return false end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+
+	if hum then
+
+		pcall(function() hum:EquipTool(melee) end)
+
+	else
+
+		melee.Parent = char
+
+	end
+
+	task.wait(0.2)
+
+	return char:FindFirstChild("Melee") ~= nil
+
+end
+
+local function getNPCID(npc)
+
+	if not npc then return nil end
+
+	local v = npc:FindFirstChild("NPCID")
+
+	if v then return v.Value end
+
+	local cfg = npc:FindFirstChild("Configuration")
+
+	if cfg then
+
+		local cv = cfg:FindFirstChild("NPCID")
+
+		if cv then return cv.Value end
+
+	end
+
+	return npc:GetAttribute("NPCID")
+
+end
+
+local function getAllNPCs(targetName)
+
+	local result = {}
+
+	local function scan(folderName)
+
+		local folder = workspace:FindFirstChild(folderName)
+
+		if not folder then return end
+
+		for _, npc in ipairs(folder:GetChildren()) do
+
+			if npc:IsA("Model") and string.find(string.lower(npc.Name), string.lower(targetName), 1, true) then
+
+				local hum = npc:FindFirstChild("Humanoid")
+
+				local hrp = npc:FindFirstChild("HumanoidRootPart")
+
+				if hum and hum.Health > 0 and hrp then
+
+					table.insert(result, { npc = npc, hrp = hrp })
+
+				end
+
+			end
+
+		end
+
+	end
+
+	scan("NPCs")
+
+	scan("Enemies")
+
+	return result
+
+end
+
+local function getClosestNPC(targetName)
+
+	local rp = getHRP()
+
+	if not rp then return nil end
+
+	local closest, bestDist = nil, math.huge
+
+	for _, d in ipairs(getAllNPCs(targetName)) do
+
+		local dist = (rp.Position - d.hrp.Position).Magnitude
+
+		if dist < bestDist then
+
+			closest = d.npc
+
+			bestDist = dist
+
+		end
+
+	end
+
+	return closest
+
+end
+
+local function collectNPCPacket(targetName, centerPos, radius)
+
+	local hrpList = {}
+
+	local npcIDs = {}
+
+	radius = radius or 24
+
+	for _, d in ipairs(getAllNPCs(targetName)) do
+
+		if d.hrp and (d.hrp.Position - centerPos).Magnitude <= radius then
+
+			table.insert(hrpList, d.hrp)
+
+			local id = getNPCID(d.npc)
+
+			if id then table.insert(npcIDs, id) end
+
+		end
+
+	end
+
+	return hrpList, npcIDs
+
+end
+
+local function getClosestNPCToPosition(targetName, centerPos, radius)
+
+	local closest, bestDist = nil, math.huge
+
+	radius = radius or 30
+
+	for _, d in ipairs(getAllNPCs(targetName)) do
+
+		local hum = d.npc and d.npc:FindFirstChild("Humanoid")
+
+		if d.hrp and hum and hum.Health > 0 then
+
+			local dist = (d.hrp.Position - centerPos).Magnitude
+
+			if dist <= radius and dist < bestDist then
+
+				closest = d.npc
+
+				bestDist = dist
+
+			end
+
+		end
+
+	end
+
+	return closest
+
+end
+
+local AIR_HOLD_BV_NAME = "KT_AirHoldBV"
+
+local AIR_HOLD_BP_NAME = "KT_AirHoldBP"
+
+local function enableAirHold(rp, targetPos)
+
+	if not rp then return end
+
+	targetPos = targetPos or rp.Position
+
+	local bv = rp:FindFirstChild(AIR_HOLD_BV_NAME)
+
+	if not bv then
+
+		bv = Instance.new("BodyVelocity")
+
+		bv.Name = AIR_HOLD_BV_NAME
+
+		bv.Parent = rp
+
+	end
+
+	bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+
+	bv.P = 1e7
+
+	bv.Velocity = Vector3.zero
+
+	local bp = rp:FindFirstChild(AIR_HOLD_BP_NAME)
+
+	if not bp then
+
+		bp = Instance.new("BodyPosition")
+
+		bp.Name = AIR_HOLD_BP_NAME
+
+		bp.Parent = rp
+
+	end
+
+	bp.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+
+	bp.P = 1e7
+
+	bp.D = 1000
+
+	bp.Position = targetPos
+
+end
+
+local function disableAirHold()
+
+	local rp = getHRP()
+
+	if not rp then return end
+
+	local bv = rp:FindFirstChild(AIR_HOLD_BV_NAME)
+
+	if bv then bv:Destroy() end
+
+	local bp = rp:FindFirstChild(AIR_HOLD_BP_NAME)
+
+	if bp then bp:Destroy() end
+
+end
+
+local function hardLockRoot(rp, hum, cf)
+
+	if not rp or not hum then return end
+
+	enableAirHold(rp, cf.Position)
+
+	hum.PlatformStand = false
+
+	hum.Sit = false
+
+	hum.AutoRotate = false
+
+	hum:ChangeState(Enum.HumanoidStateType.Freefall)
+
+	rp.CFrame = cf
+
+	rp.AssemblyLinearVelocity = Vector3.zero
+
+	rp.AssemblyAngularVelocity = Vector3.zero
+
+	rp.Velocity = Vector3.zero
+
+end
+
+local function lockAbovePosition(pos, duration)
+
+	if typeof(pos) ~= "Vector3" then return end
+
+	local untilTime = tick() + (duration or 0.25)
+
+	while tick() < untilTime do
+
+		local rp = getHRP()
+
+		local hum = getHumanoid()
+
+		if not rp or not hum or hum.Health <= 0 then break end
+
+		hardLockRoot(rp, hum, CFrame.new(pos))
+
+		RunService.Heartbeat:Wait()
+
+	end
+
+end
+
+-- Calcule la CFrame de combat pour les yetis : on reste centre au-dessus
+
+-- du yeti Ã  hauteur fixedY, sans rotation couchÃ©e.
+
+local function getYetiCombatCFrame(yetiHrp, fixedY, currentRp)
+
+	if not yetiHrp then return nil end
+
+	local dist = tonumber(H.YETI_HIT_DISTANCE) or 8.5
+
+	local hoverY = fixedY or (yetiHrp.Position.Y + (tonumber(H.YETI_HOVER_HEIGHT) or 8.3))
+
+	local pos
+
+	if dist <= 0 then
+
+		pos = Vector3.new(yetiHrp.Position.X, hoverY, yetiHrp.Position.Z)
+
+	else
+
+		local away
+
+		if currentRp then
+
+			away = Vector3.new(
+
+				currentRp.Position.X - yetiHrp.Position.X,
+
+				0,
+
+				currentRp.Position.Z - yetiHrp.Position.Z
+
+			)
+
+		end
+
+		if not away or away.Magnitude <= 0.05 then
+
+			local a = math.rad(tonumber(H.YETI_HIT_ROTATION_Y) or 0)
+
+			away = Vector3.new(math.sin(a), 0, math.cos(a))
+
+		else
+
+			away = away.Unit
+
+		end
+
+		pos = Vector3.new(
+
+			yetiHrp.Position.X + away.X * dist,
+
+			hoverY,
+
+			yetiHrp.Position.Z + away.Z * dist
+
+		)
+
+	end
+
+	local rotX = math.rad(tonumber(H.YETI_HIT_ROTATION_X) or 0)
+
+	local rotY = math.rad(tonumber(H.YETI_HIT_ROTATION_Y) or 0)
+
+	local rotZ = math.rad(tonumber(H.YETI_HIT_ROTATION_Z) or 0)
+
+	return CFrame.new(pos) * CFrame.Angles(rotX, rotY, rotZ)
+
+end
+
+local function lockAboveNPC(npc, hoverHeight, duration, fixedY)
+
+	hoverHeight = hoverHeight or 8.6
+
+	local untilTime = tick() + (duration or 0.25)
+
+	local isYeti = npc and npc.Name == "Yeti"
+
+	while tick() < untilTime do
+
+		local rp = getHRP()
+
+		local humSelf = getHumanoid()
+
+		local hrp = npc and npc:FindFirstChild("HumanoidRootPart")
+
+		local hum = npc and npc:FindFirstChild("Humanoid")
+
+		if not rp or not humSelf or humSelf.Health <= 0 or not hrp or not hum or hum.Health <= 0 then
+
+			break
+
+		end
+
+		local y = fixedY or (hrp.Position.Y + hoverHeight)
+
+		local cf
+
+		if isYeti then
+
+			cf = getYetiCombatCFrame(hrp, y, rp) or CFrame.new(hrp.Position.X, y, hrp.Position.Z)
+
+		else
+
+			cf = CFrame.new(hrp.Position.X, y, hrp.Position.Z)
+
+		end
+
+		hardLockRoot(rp, humSelf, cf)
+
+		RunService.Heartbeat:Wait()
+
+	end
+
+end
+
+local function doDamageCombo(targetName, centerPos, lockPos, radius)
+
+	local rp = getHRP()
+
+	if not rp then return end
+
+	equipMelee()
+
+	local hoverHeight = 8.6
+
+	if lockPos and typeof(lockPos) == "Vector3" then
+
+		hoverHeight = math.max(2, lockPos.Y - centerPos.Y)
+
+	end
+
+	for combo = 1, 5 do
+
+		if not getgenv().KaitunFarm and not getgenv().Sea2Farm then break end
+
+		local followNpc = getClosestNPCToPosition(targetName, centerPos, radius or 30)
+
+		local fixedCombatY = lockPos and lockPos.Y or (centerPos.Y + hoverHeight)
+
+		local clusterCenterPos = centerPos
+
+		if followNpc then
+
+			lockAboveNPC(followNpc, hoverHeight, 0.08, fixedCombatY)
+
+		elseif lockPos then
+
+			lockAbovePosition(lockPos, 0.08)
+
+		end
+
+		pcall(function()
+
+			local current = getHRP()
+
+			local followHrp = followNpc and followNpc:FindFirstChild("HumanoidRootPart")
+
+			local followHum = followNpc and followNpc:FindFirstChild("Humanoid")
+
+			local clusterRadius = math.max(radius or 24, 36)
+
+			if current and followHrp and followHum and followHum.Health > 0 then
+
+				clusterCenterPos = followHrp.Position
+
+				current.CFrame = CFrame.new(followHrp.Position.X, fixedCombatY, followHrp.Position.Z)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			elseif current and lockPos then
+
+				current.CFrame = CFrame.new(lockPos)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			end
+
+			local hrpList, npcIDs = collectNPCPacket(targetName, clusterCenterPos, clusterRadius)
+
+			if #hrpList == 0 and followHrp then
+
+				hrpList = { followHrp }
+
+				local id = getNPCID(followNpc)
+
+				if id then npcIDs = { id } end
+
+			end
+
+			if #hrpList == 0 then return end
+
+			combatRegister:InvokeServer({
+
+				[1] = "swingsfx", [2] = "Melee", [3] = combo,
+
+				[4] = "Ground", [5] = false, [6] = CombatAnims[combo],
+
+				[7] = 2, [8] = 1.5,
+
+			})
+
+			current = getHRP()
+
+			followHrp = followNpc and followNpc:FindFirstChild("HumanoidRootPart")
+
+			followHum = followNpc and followNpc:FindFirstChild("Humanoid")
+
+			if current and followHrp and followHum and followHum.Health > 0 then
+
+				clusterCenterPos = followHrp.Position
+
+				current.CFrame = CFrame.new(followHrp.Position.X, fixedCombatY, followHrp.Position.Z)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			elseif current and lockPos then
+
+				current.CFrame = CFrame.new(lockPos)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			end
+
+			local packet = {
+
+				[1] = {
+
+					[1] = "damage", [2] = hrpList, [3] = "Melee",
+
+					[4] = { combo, "Ground", "Melee" }, [5] = true,
+
+					[6] = current and current.CFrame or CFrame.new(lockPos or centerPos),
+
+					aircombo = "Ground",
+
+				}
+
+			}
+
+			if #npcIDs > 0 then packet[1].NPCIDs = npcIDs end
+
+			combatRegister:InvokeServer(unpack(packet))
+
+		end)
+
+		if followNpc then
+
+			lockAboveNPC(followNpc, hoverHeight, 0.05, fixedCombatY)
+
+		elseif lockPos then
+
+			lockAbovePosition(lockPos, 0.05)
+
+		else
+
+			task.wait(0.21)
+
+		end
+
+	end
+
+	local finalNpc = getClosestNPCToPosition(targetName, centerPos, radius or 30)
+
+	if finalNpc then
+
+		local fixedFinalY = lockPos and lockPos.Y or (centerPos.Y + hoverHeight)
+
+		lockAboveNPC(finalNpc, hoverHeight, 1, fixedFinalY)
+
+	elseif lockPos then
+
+		lockAbovePosition(lockPos, 1)
+
+	else
+
+		task.wait(1)
+
+	end
+
+end
+
+local function hitSingleNPC(npc, hoverHeight)
+
+	local hrp = npc and npc:FindFirstChild("HumanoidRootPart")
+
+	local rp = getHRP()
+
+	if not hrp or not rp then return end
+
+	hoverHeight = hoverHeight or 8.6
+
+	local fixedCombatY = hrp.Position.Y + hoverHeight
+
+	lockAboveNPC(npc, hoverHeight, 0.12, fixedCombatY)
+
+	local id = getNPCID(npc)
+
+	pcall(function()
+
+		local current = getHRP()
+
+		local liveHrp = npc and npc:FindFirstChild("HumanoidRootPart")
+
+		local liveHum = npc and npc:FindFirstChild("Humanoid")
+
+		local packetCenter = liveHrp and liveHrp.Position or hrp.Position
+
+		if current and liveHrp and liveHum and liveHum.Health > 0 then
+
+			current.CFrame = CFrame.new(liveHrp.Position.X, fixedCombatY, liveHrp.Position.Z)
+
+			current.AssemblyLinearVelocity = Vector3.zero
+
+			current.AssemblyAngularVelocity = Vector3.zero
+
+		end
+
+		combatRegister:InvokeServer({
+
+			[1] = "swingsfx", [2] = "Melee", [3] = 1,
+
+			[4] = "Ground", [5] = false, [6] = CombatAnims[1],
+
+			[7] = 2, [8] = 1.5,
+
+		})
+
+		current = getHRP()
+
+		liveHrp = npc and npc:FindFirstChild("HumanoidRootPart")
+
+		liveHum = npc and npc:FindFirstChild("Humanoid")
+
+		packetCenter = liveHrp and liveHrp.Position or packetCenter
+
+		if current and liveHrp and liveHum and liveHum.Health > 0 then
+
+			current.CFrame = CFrame.new(liveHrp.Position.X, fixedCombatY, liveHrp.Position.Z)
+
+			current.AssemblyLinearVelocity = Vector3.zero
+
+			current.AssemblyAngularVelocity = Vector3.zero
+
+		end
+
+		local hrpList, npcIDs = collectNPCPacket(npc.Name, packetCenter, 22)
+
+		if #hrpList == 0 then
+
+			hrpList = { liveHrp or hrp }
+
+			if id then npcIDs = { id } end
+
+		end
+
+		local packet = {
+
+			[1] = {
+
+				[1] = "damage", [2] = hrpList, [3] = "Melee",
+
+				[4] = { 1, "Ground", "Melee" }, [5] = true,
+
+				[6] = current and current.CFrame or CFrame.new(hrp.Position.X, fixedCombatY, hrp.Position.Z),
+
+				aircombo = "Ground",
+
+			}
+
+		}
+
+		if #npcIDs > 0 then packet[1].NPCIDs = npcIDs end
+
+		combatRegister:InvokeServer(unpack(packet))
+
+	end)
+
+	lockAboveNPC(npc, hoverHeight, 0.45, fixedCombatY)
+
+end
+
+-- ============================================================
+
+-- FISHMAN ROUTES
+
+-- ============================================================
+
+local FISHMAN_CAVE_PATH = {
+
+	Vector3.new(8004.085, -2153.832, -17015.412),
+
+	Vector3.new(8003.483, -2153.832, -17143.662),
+
+	Vector3.new(7860.256, -2153.832, -17159.465),
+
+	Vector3.new(7817.588, -2176.832, -17167.414),
+
+	Vector3.new(7778.929, -2176.832, -17228.219),
+
+	Vector3.new(7764.174, -2176.855, -17280.283),
+
+	Vector3.new(7747.894, -2176.832, -17314.391),
+
+}
+
+local FISHMAN_ESCAPE_PATH = {
+
+	Vector3.new(8015.373, -2153.832, -17116.010),
+
+	Vector3.new(8211.618, -2141.832, -17101.418),
+
+	Vector3.new(8229.126, -2141.832, -17159.701),
+
+	Vector3.new(8525.697, -2140.832, -17158.080),
+
+	Vector3.new(8544.997, -2138.832, -17090.734),
+
+	Vector3.new(8576.332, -2138.832, -17089.451),
+
+}
+
+local function isOnFishmanIsland()
+
+	local rp = getHRP()
+
+	if not rp then return false end
+
+	return isFishmanRegionPosition(rp.Position)
+
+end
+
+local function isInFishmanCave()
+
+	local rp = getHRP()
+
+	if not rp then return false end
+
+	return isFishmanRegionPosition(rp.Position)
+
+end
+
+local function getFishmanExitPart()
+
+	local area = workspace:FindFirstChild("AreaTeleporters")
+
+	local firstSea = area and area:FindFirstChild("FirstSea")
+
+	local fishman = firstSea and firstSea:FindFirstChild("Fishman")
+
+	return fishman and fishman:FindFirstChild("Part2")
+
+end
+
+local function tweenIntoPart(part)
+
+	if not part or not part:IsA("BasePart") then return false end
+
+	local targetPos = part.Position
+
+	local started = tick()
+
+	setNoclip(true)
+
+	releaseMovementKeys()
+
+	while tick() - started < 4 do
+
+		local rp = getHRP()
+
+		local hum = getHumanoid()
+
+		if not rp or not hum or hum.Health <= 0 then return false end
+
+		local delta = targetPos - rp.Position
+
+		local dist = delta.Magnitude
+
+		if dist <= 1.2 then
+
+			rp.AssemblyLinearVelocity = Vector3.zero
+
+			rp.AssemblyAngularVelocity = Vector3.zero
+
+			return true
+
+		end
+
+		local dt = RunService.Heartbeat:Wait()
+
+		local step = math.min((H.teleportSpeed or 70) * dt, dist)
+
+		rp.CFrame = CFrame.new(rp.Position + delta.Unit * step)
+
+		rp.AssemblyLinearVelocity = Vector3.zero
+
+		rp.AssemblyAngularVelocity = Vector3.zero
+
+	end
+
+	return false
+
+end
+
+local function DoFishmanEscapeTeleport(targetPos)
+
+	if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+
+	if typeof(targetPos) ~= "Vector3" then return false end
+
+	local started = tick()
+
+	setNoclip(true)
+
+	releaseMovementKeys()
+
+	while tick() - started < 10 do
+
+		local rp = getHRP()
+
+		local hum = getHumanoid()
+
+		if not rp or not hum or hum.Health <= 0 then return false end
+
+		local delta = targetPos - rp.Position
+
+		local dist = delta.Magnitude
+
+		if dist <= 2.5 then
+
+			rp.CFrame = CFrame.new(targetPos)
+
+			rp.AssemblyLinearVelocity = Vector3.zero
+
+			rp.AssemblyAngularVelocity = Vector3.zero
+
+			return true
+
+		end
+
+		local dt = RunService.Heartbeat:Wait()
+
+		local step = math.min((H.teleportSpeed or 70) * dt, dist, 5)
+
+		local dir = delta.Unit
+
+		rp.CFrame = CFrame.new(rp.Position + dir * step)
+
+		rp.AssemblyLinearVelocity = Vector3.zero
+
+		rp.AssemblyAngularVelocity = Vector3.zero
+
+	end
+
+	return false
+
+end
+
+local function fishmanEscape()
+
+	if not isInFishmanCave() and not isOnFishmanIsland() then return false end
+
+	notify("Kaitun", "Leaving Fishman Island...", 4)
+
+	setNoclip(true)
+
+	H.fishmanEscaping = true
+
+	local escapeWaitPos = Vector3.new(8588.937, -2138.832, -17086.459)
+
+	local ok = pcall(function()
+
+		for _, wp in ipairs(FISHMAN_ESCAPE_PATH) do
+
+			if not getgenv().KaitunFarm and not getgenv().Sea2Farm then break end
+
+			DoFishmanEscapeTeleport(wp)
+
+			task.wait(0.21)
+
+		end
+
+		local exitPart = getFishmanExitPart()
+
+		if exitPart then
+
+			notify("Kaitun", "Entering Fishman Part2 teleporter...", 4)
+
+			DoFishmanEscapeTeleport(exitPart.Position)
+
+			tweenIntoPart(exitPart)
+
+		else
+
+			DoFishmanEscapeTeleport(escapeWaitPos)
+
+		end
+
+	end)
+
+	releaseMovementKeys()
+
+	H.fishmanEscaping = false
+
+	notify("Kaitun", "Fishman teleporter reached. Waiting 4s before Geppo...", 4)
+
+	task.wait(4)
+
+	return ok
+
+end
+
+local function ensureEscapedFishman(context)
+
+	if not isAlive() then
+
+		waitUntilAliveStable(8)
+
+	end
+
+	for _ = 1, 10 do
+
+		local rp = getHRP()
+
+		if rp then break end
+
+		task.wait(0.1)
+
+	end
+
+	if not isInFishmanCave() and not isOnFishmanIsland() then
+
+		return false
+
+	end
+
+	notify("Kaitun", tostring(context or "Fishman Cave") .. ": escaping Fishman by waypoints first...", 5)
+
+	H.tpToken = H.tpToken + 1
+
+	setNoclip(true)
+
+	releaseMovementKeys()
+
+	local escaped = fishmanEscape()
+
+	waitUntilAliveStable(5)
+
+	releaseMovementKeys()
+
+	return escaped
+
+end
+
+-- ============================================================
+
+-- KAITUN REQUIREMENT CHECKS
+
+-- ============================================================
+
+local function hasSkyWalk()
+
+	local root = getStatsRoot()
+
+	local sk = root and root:FindFirstChild("Skills") and root.Skills:FindFirstChild("skyWalk")
+
+	return sk and sk.Value == true
+
+end
+
+local function hasHaki()
+
+	local root = getStatsRoot()
+
+	local bm = root and root:FindFirstChild("Stats") and root.Stats:FindFirstChild("BusoMastery")
+
+	return bm and bm.Value > 0
+
+end
+
+local function hasWorldScroll()
+
+	if hasInventoryItem("World Scroll") then
+
+		return true
+
+	end
+
+	local ok, found = pcall(function()
+
+		local pg = LocalPlayer:FindFirstChild("PlayerGui")
+
+		local inv = pg and pg:FindFirstChild("Inventory")
+
+		local main = inv and inv:FindFirstChild("Main")
+
+		if not main then return false end
+
+		local wasOpen = main.Visible
+
+		main.Visible = true
+
+		task.wait(0.2)
+
+		local list = main:FindFirstChild("Inventory") and main.Inventory:FindFirstChild("List")
+
+		local result = false
+
+		if list then
+
+			for _, child in ipairs(list:GetDescendants()) do
+
+				if child.Name == "World Scroll" then
+
+					result = true
+
+					break
+
+				end
+
+			end
+
+		end
+
+		main.Visible = wasOpen
+
+		return result
+
+	end)
+
+	return ok and found == true
+
+end
+
+-- ============================================================
+
+-- PHASE 1: FISHMAN FARM TO 425
+
+-- ============================================================
+
+local function cancelQuestIfDifferent(wantedQuest)
+
+	wantedQuest = tostring(wantedQuest or "")
+
+	local current = getQuest()
+
+	if current == "" or current == wantedQuest then
+
+		return false
+
+	end
+
+	notify("Quest", "Cancel old quest: " .. tostring(current) .. " -> " .. tostring(wantedQuest), 4)
+
+	pcall(function()
+
+		questEvent:InvokeServer({ [1] = "quit" })
+
+	end)
+
+	pcall(function()
+
+		local args = { { "quit" } }
+
+		questEvent:InvokeServer(unpack(args))
+
+	end)
+
+	task.wait(0.35)
+
+	if getQuest() ~= "" and getQuest() ~= wantedQuest then
+
+		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
+		local quitBtn = playerGui
+
+			and playerGui:FindFirstChild("Quest")
+
+			and playerGui.Quest:FindFirstChild("Main")
+
+			and playerGui.Quest.Main:FindFirstChild("Misc")
+
+			and playerGui.Quest.Main.Misc:FindFirstChild("Quit")
+
+		if quitBtn then
+
+			pcall(function() quitBtn:Activate() end)
+
+		end
+
+	end
+
+	task.wait(0.65)
+
+	return true
+
+end
+
+local function takeQuest(questName, questPos, safeNoNoclip)
+
+	if not questName or questName == "" then return end
+
+	releaseMovementKeys()
+
+	cancelQuestIfDifferent(questName)
+
+	if getQuest() == questName then
+
+		return
+
+	end
+
+	DoSafeTeleport(questPos, safeNoNoclip == true, safeNoNoclip ~= true)
+
+	task.wait(1)
+
+	cancelQuestIfDifferent(questName)
+
+	pcall(function()
+
+		questEvent:InvokeServer({ [1] = "takequest", [2] = questName })
+
+	end)
+
+	task.wait(1)
+
+end
+
+-- ============================================================
+
+-- PHASE 1: FISHMAN FARM TO 425
+
+-- FIX: le perso se pose UNE FOIS sur le lockPos (centre cave + hoverHeight)
+
+-- et n'en bouge plus. doDamageCombo frappe tout dans le rayon sans TP NPC par NPC.
+
+-- ============================================================
+
+local function phase1FishmanFarm()
+
+	notify("Kaitun", "Phase 1: Fishman farm", 5)
+
+	getgenv().KaitunFarm = true
+
+	H.autoAdsEnabled = true
+
+	H.autoStatsEnabled = true
+
+	setNoclip(true)
+
+	H.teleportSpeed = DefaultConfig.MAIN.TWEEN_SPEED or 70
+
+	local targetName    = "Fishman Karate User"
+
+	local questName     = "Help becky"
+
+	local questMinLevel = 190
+
+	local questPos      = Vector3.new(7731.026, -2175.832, -17222.637)
+
+	local center        = Vector3.new(7736.441, -2176.832, -17308.871)
+
+	local hoverHeight   = 8.4
+
+	local arrivedAtCave = false
+
+	-- Position de combat fixe : au-dessus du centre de la cave, le perso n'en bouge plus
+
+	local lockPos = Vector3.new(center.X, center.Y + hoverHeight, center.Z)
+
+	while getgenv().KaitunFarm do
+
+		if not isAlive() then task.wait(0.5) continue end
+
+		local level    = getLevel()
+
+		local levelCap = DefaultConfig.MAIN.LEVEL or 675
+
+		if level >= 425 then
+
+			notify("Kaitun", "Level 425 reached. Leaving Fishman phase.", 5)
+
+			break
+
+		end
+
+		if level >= levelCap then
+
+			notify("Kaitun", "Configured level reached.", 5)
+
+			break
+
+		end
+
+		equipMelee()
+
+		local rp = getHRP()
+
+		if not rp then task.wait(0.5) continue end
+
+		-- Aller a la cave une seule fois via les waypoints
+
+		if not arrivedAtCave then
+
+			if (rp.Position - center).Magnitude > 120 then
+
+				notify("Kaitun", "Going to Fishman cave by waypoints...", 4)
+
+				for _, wp in ipairs(FISHMAN_CAVE_PATH) do
+
+					if not getgenv().KaitunFarm then break end
+
+					DoSafeTeleport(wp, true)
+
+					task.wait(0.21)
+
+				end
+
+			end
+
+			-- Se poser sur le lockPos central et y rester
+
+			DoSafeTeleport(lockPos, true)
+
+			task.wait(0.3)
+
+			arrivedAtCave = true
+
+		end
+
+		-- Si le perso s'est eloigne du lockPos (mort/respawn/knockback), le ramener
+
+		rp = getHRP()
+
+		if not rp then task.wait(0.5) continue end
+
+		if (rp.Position - lockPos).Magnitude > 20 then
+
+			arrivedAtCave = false
+
+			continue
+
+		end
+
+		-- Prendre la quete si besoin (revenir au lockPos apres)
+
+		if level >= questMinLevel and getQuest() ~= questName then
+
+			takeQuest(questName, questPos)
+
+			DoSafeTeleport(lockPos, true)
+
+			task.wait(0.5)
+
+			continue
+
+		end
+
+		local npcs = getAllNPCs(targetName)
+
+		if #npcs == 0 then
+
+			-- Pas de NPC, rester ancre sur le lockPos en attendant le respawn
+
+			enableAirHold(getHRP(), lockPos)
+
+			task.wait(0.5)
+
+			continue
+
+		end
+
+		-- Un seul appel : frappe tout ce qui est dans le rayon autour du centre
+
+		-- Le perso reste sur lockPos, ne bouge plus NPC par NPC
+
+		doDamageCombo(targetName, center, lockPos, 30)
+
+		task.wait(0.21)
+
+	end
+
+end
+
+-- ============================================================
+
+-- PHASE 2: GEPPO
+
+-- ============================================================
+
+local function phase2Geppo()
+
+	if not getgenv().KaitunFarm then return end
+
+	if not configFlag("STYLE", "Geppo", true) then
+
+		notify("Kaitun", "Geppo disabled by config.", 4)
+
+		return
+
+	end
+
+	if hasSkyWalk() then
+
+		notify("Kaitun", "Geppo already owned.", 4)
+
+		ensureEscapedFishman("Geppo")
+
+		return
+
+	end
+
+	ensureEscapedFishman("Geppo")
+
+	notify("Kaitun", "Buying Geppo...", 5)
+
+	DoSafeTeleport(Vector3.new(-3087.715, 94.544, -11755.474))
+
+	task.wait(1.5)
+
+	pcall(function()
+
+		ReplicatedStorage:WaitForChild("Events"):WaitForChild("learnStyle"):FireServer("skyWalkTrainer")
+
+	end)
+
+	task.wait(2)
+
+end
+
+-- ============================================================
+
+-- PHASE 3: HAKI
+
+-- ============================================================
+
+local function getAllYetis()
+
+	local result = {}
+
+	local folder = workspace:FindFirstChild("NPCs")
+
+	if not folder then return result end
+
+	for _, npc in ipairs(folder:GetChildren()) do
+
+		if npc:IsA("Model") and npc.Name == "Yeti" then
+
+			local hum = npc:FindFirstChild("Humanoid")
+
+			local hrp = npc:FindFirstChild("HumanoidRootPart")
+
+			if hum and hum.Health > 0 and hrp then
+
+				local y = hrp.Position.Y
+
+				if y >= H.YETI_MIN_SAFE_Y and y <= H.YETI_MAX_SAFE_Y then
+
+					table.insert(result, { npc = npc, hrp = hrp })
+
+				end
+
+			end
+
+		end
+
+	end
+
+	return result
+
+end
+
+local function getTargetedYetis()
+
+	local result = {}
+
+	local used = {}
+
+	for _, spot in ipairs(H.YETI_TARGET_SPOTS or {}) do
+
+		if typeof(spot) == "Vector3" then
+
+			local bestNpc = nil
+
+			local bestDist = math.huge
+
+			for _, d in ipairs(getAllYetis()) do
+
+				if d.npc and d.hrp and not used[d.npc] and isInsideYetiZone(d.hrp.Position) then
+
+					local hum = d.npc:FindFirstChild("Humanoid")
+
+					if hum and hum.Health > 0 then
+
+						local dist = (spot - d.hrp.Position).Magnitude
+
+						if dist < bestDist then
+
+							bestDist = dist
+
+							bestNpc = d.npc
+
+						end
+
+					end
+
+				end
+
+			end
+
+			if bestNpc and bestDist <= (H.YETI_TARGET_MAX_DISTANCE or 45) then
+
+				used[bestNpc] = true
+
+				table.insert(result, bestNpc)
+
+			end
+
+		end
+
+	end
+
+	return result
+
+end
+
+local function getClosestYeti()
+
+	local rp = getHRP()
+
+	if not rp then return nil end
+
+	local closest, bestDist = nil, math.huge
+
+	for _, npc in ipairs(getTargetedYetis()) do
+
+		local hrp = npc and npc:FindFirstChild("HumanoidRootPart")
+
+		local hum = npc and npc:FindFirstChild("Humanoid")
+
+		if hrp and hum and hum.Health > 0 then
+
+			local dist = (rp.Position - hrp.Position).Magnitude
+
+			if dist < bestDist then
+
+				closest = npc
+
+				bestDist = dist
+
+			end
+
+		end
+
+	end
+
+	return closest
+
+end
+
+local function shouldAbandonYeti(yetiHrp)
+
+	if not yetiHrp then return true end
+
+	local bestSpotDist = math.huge
+
+	local closestSpot = nil
+
+	for _, spot in ipairs(H.YETI_TARGET_SPOTS or {}) do
+
+		if typeof(spot) == "Vector3" then
+
+			local flatDist = Vector3.new(
+
+				yetiHrp.Position.X - spot.X,
+
+				0,
+
+				yetiHrp.Position.Z - spot.Z
+
+			).Magnitude
+
+			if flatDist < bestSpotDist then
+
+				bestSpotDist = flatDist
+
+				closestSpot = spot
+
+			end
+
+		end
+
+	end
+
+	if not closestSpot then
+
+		return false
+
+	end
+
+	if bestSpotDist > (H.YETI_ABANDON_DISTANCE or 38) then
+
+		return true
+
+	end
+
+	if yetiHrp.Position.Y < closestSpot.Y - (H.YETI_ABANDON_Y_DROP or 25) then
+
+		return true
+
+	end
+
+	return false
+
+end
+
+local function attackYeti(yeti)
+
+	setNoclip(true)
+
+	if not yeti then return false end
+
+	local hum = yeti:FindFirstChild("Humanoid")
+
+	local firstHrp = yeti:FindFirstChild("HumanoidRootPart")
+
+	if not hum or hum.Health <= 0 or not firstHrp then return false end
+
+	local hoverHeight = H.YETI_HOVER_HEIGHT or 8.3
+
+	-- Verrou permanent pendant tout le combat: tant que ce Yeti est vivant,
+
+	-- on reste colle a lui et on continue les combos sans retourner au farmPos.
+
+	local lockActive = true
+
+	local humSelf = getHumanoid()
+
+	if humSelf then humSelf.AutoRotate = false end
+
+	local lockConn = RunService.Heartbeat:Connect(function()
+
+		if not lockActive then return end
+
+		local liveHrp = yeti and yeti:FindFirstChild("HumanoidRootPart")
+
+		local liveHum = yeti and yeti:FindFirstChild("Humanoid")
+
+		local rp = getHRP()
+
+		local hs = getHumanoid()
+
+		if not rp or not hs or hs.Health <= 0 or not liveHrp or not liveHum or liveHum.Health <= 0 then return end
+
+		setNoclip(true)
+
+		hs.AutoRotate = false
+
+		local liveCombatY = liveHrp.Position.Y + hoverHeight
+
+		local cf = getYetiCombatCFrame(liveHrp, liveCombatY, rp)
+
+		if cf then
+
+			local clampedPos = clampToYetiZone(cf.Position)
+
+			local clampedCf = cf - cf.Position + clampedPos
+
+			rp.CFrame = clampedCf
+
+			rp.AssemblyLinearVelocity = Vector3.zero
+
+			rp.AssemblyAngularVelocity = Vector3.zero
+
+		end
+
+	end)
+
+	local killed = false
+
+	local combo = 1
+
+	while getgenv().KaitunFarm and not hasHaki() do
+
+		setNoclip(true)
+
+		local hrp = yeti:FindFirstChild("HumanoidRootPart")
+
+		hum = yeti:FindFirstChild("Humanoid")
+
+		local rp = getHRP()
+
+		if not hrp or not rp or not hum then
+
+			break
+
+		end
+
+		if hum.Health <= 0 then
+
+			killed = true
+
+			break
+
+		end
+
+		local selfHum = getHumanoid()
+
+		if selfHum and selfHum.Health <= (H.HAKI_LOW_HP_THRESHOLD or 100) then
+
+			break
+
+		end
+
+		if shouldAbandonYeti(hrp) then
+
+			break
+
+		end
+
+		local hrpList = { hrp }
+
+		local npcIDs = {}
+
+		local id = getNPCID(yeti)
+
+		if id then table.insert(npcIDs, id) end
+
+		pcall(function()
+
+			local current = getHRP()
+
+			if current then
+
+				local liveCombatY = hrp.Position.Y + hoverHeight
+
+				local cf = getYetiCombatCFrame(hrp, liveCombatY, current)
+
+				if cf then
+
+					current.CFrame = cf - cf.Position + clampToYetiZone(cf.Position)
+
+					current.AssemblyLinearVelocity = Vector3.zero
+
+					current.AssemblyAngularVelocity = Vector3.zero
+
+				end
+
+			end
+
+			combatRegister:InvokeServer({
+
+				[1] = "swingsfx", [2] = "Melee", [3] = combo,
+
+				[4] = "Ground", [5] = false, [6] = CombatAnims[combo],
+
+				[7] = 2, [8] = 1.5,
+
+			})
+
+			current = getHRP()
+
+			local packet = {
+
+				[1] = {
+
+					[1] = "damage", [2] = hrpList, [3] = "Melee",
+
+					[4] = { combo, "Ground", "Melee" }, [5] = true,
+
+					[6] = current and current.CFrame or CFrame.new(hrp.Position.X, hrp.Position.Y + hoverHeight, hrp.Position.Z),
+
+					aircombo = "Ground",
+
+				}
+
+			}
+
+			if #npcIDs > 0 then packet[1].NPCIDs = npcIDs end
+
+			combatRegister:InvokeServer(unpack(packet))
+
+		end)
+
+		combo = combo % 5 + 1
+
+		task.wait(0.18)
+
+	end
+
+	task.wait(0.25)
+
+	lockActive = false
+
+	if lockConn then lockConn:Disconnect() end
+
+	local humEnd = getHumanoid()
+
+	if humEnd then humEnd.AutoRotate = true end
+
+	local after = yeti:FindFirstChild("Humanoid")
+
+	return killed or not after or after.Health <= 0
+
+end
+
+-- ============================================================
+
+-- HAKI OVERLAY
+
+-- ============================================================
+
+local HakiOverlay = {
+
+	kills = 0,
+
+	maxKills = 50,
+
+	status = "tweening",
+
+	gui = nil,
+
+	statusLabel = nil,
+
+	killsLabel = nil,
+
+	updateLoopID = 0,
+
+	cameraHidden = false,
+
+	oldCameraType = nil,
+
+	oldCameraSubject = nil,
+
+	oldCameraCFrame = nil,
+
+	oldCameraFOV = nil,
+
+	cameraConn = nil,
+
+	hudHidden = false,
+
+	hudTransparencyCache = {},
+
+}
+
+local hideHakiOverlay
+
+local function cacheAndSetTransparency(obj, propName, value)
+
+	local ok, oldValue = pcall(function()
+
+		return obj[propName]
+
+	end)
+
+	if not ok then return end
+
+	table.insert(HakiOverlay.hudTransparencyCache, {
+
+		obj = obj,
+
+		prop = propName,
+
+		value = oldValue,
+
+	})
+
+	pcall(function()
+
+		obj[propName] = value
+
+	end)
+
+end
+
+local function makeHudObjectInvisible(obj)
+
+	if not obj then return end
+
+	if obj:IsA("GuiObject") then
+
+		cacheAndSetTransparency(obj, "BackgroundTransparency", 1)
+
+	end
+
+	if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+
+		cacheAndSetTransparency(obj, "TextTransparency", 1)
+
+		cacheAndSetTransparency(obj, "TextStrokeTransparency", 1)
+
+	end
+
+	if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+
+		cacheAndSetTransparency(obj, "ImageTransparency", 1)
+
+	end
+
+	if obj:IsA("UIStroke") then
+
+		cacheAndSetTransparency(obj, "Transparency", 1)
+
+	end
+
+end
+
+local function hideHakiHudBars()
+
+	if HakiOverlay.hudHidden then return end
+
+	HakiOverlay.hudHidden = true
+
+	HakiOverlay.hudTransparencyCache = {}
+
+	pcall(function()
+
+		local targets = {}
+
+		local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
+		local playerBars = playerGui
+
+			and playerGui:FindFirstChild("HUD")
+
+			and playerGui.HUD:FindFirstChild("Main")
+
+			and playerGui.HUD.Main:FindFirstChild("Bars")
+
+		if playerBars then table.insert(targets, playerBars) end
+
+		local templateBars = ReplicatedStorage:FindFirstChild("GUIS")
+
+			and ReplicatedStorage.GUIS:FindFirstChild("HUD")
+
+			and ReplicatedStorage.GUIS.HUD:FindFirstChild("Main")
+
+			and ReplicatedStorage.GUIS.HUD.Main:FindFirstChild("Bars")
+
+		if templateBars then table.insert(targets, templateBars) end
+
+		for _, root in ipairs(targets) do
+
+			makeHudObjectInvisible(root)
+
+			for _, obj in ipairs(root:GetDescendants()) do
+
+				makeHudObjectInvisible(obj)
+
+			end
+
+		end
+
+	end)
+
+end
+
+local function restoreHakiHudBars()
+
+	if not HakiOverlay.hudHidden then return end
+
+	for i = #HakiOverlay.hudTransparencyCache, 1, -1 do
+
+		local item = HakiOverlay.hudTransparencyCache[i]
+
+		if item and item.obj and item.obj.Parent then
+
+			pcall(function()
+
+				item.obj[item.prop] = item.value
+
+			end)
+
+		end
+
+	end
+
+	HakiOverlay.hudTransparencyCache = {}
+
+	HakiOverlay.hudHidden = false
+
+end
+
+local function hideHakiCamera()
+
+	if HakiOverlay.cameraHidden then return end
+
+	pcall(function()
+
+		local cam = workspace.CurrentCamera
+
+		if not cam then return end
+
+		HakiOverlay.cameraHidden = true
+
+		HakiOverlay.oldCameraType = cam.CameraType
+
+		HakiOverlay.oldCameraSubject = cam.CameraSubject
+
+		HakiOverlay.oldCameraCFrame = cam.CFrame
+
+		HakiOverlay.oldCameraFOV = cam.FieldOfView
+
+		cam.CameraType = Enum.CameraType.Scriptable
+
+		cam.CameraSubject = nil
+
+		cam.FieldOfView = 40
+
+		local privacyCFrame = CFrame.new(-4475.706, 520, -2964.551) * CFrame.Angles(math.rad(-90), 0, 0)
+
+		cam.CFrame = privacyCFrame
+
+		if HakiOverlay.cameraConn then
+
+			HakiOverlay.cameraConn:Disconnect()
+
+		end
+
+		HakiOverlay.cameraConn = RunService.RenderStepped:Connect(function()
+
+			local liveCam = workspace.CurrentCamera
+
+			if liveCam and HakiOverlay.cameraHidden then
+
+				liveCam.CameraType = Enum.CameraType.Scriptable
+
+				liveCam.CFrame = privacyCFrame
+
+			end
+
+		end)
+
+	end)
+
+end
+
+local function restoreHakiCamera()
+
+	if not HakiOverlay.cameraHidden then return end
+
+	pcall(function()
+
+		if HakiOverlay.cameraConn then
+
+			HakiOverlay.cameraConn:Disconnect()
+
+			HakiOverlay.cameraConn = nil
+
+		end
+
+		local cam = workspace.CurrentCamera
+
+		if cam then
+
+			cam.CameraType = HakiOverlay.oldCameraType or Enum.CameraType.Custom
+
+			cam.CameraSubject = HakiOverlay.oldCameraSubject or getHumanoid()
+
+			if HakiOverlay.oldCameraCFrame then
+
+				cam.CFrame = HakiOverlay.oldCameraCFrame
+
+			end
+
+			if HakiOverlay.oldCameraFOV then
+
+				cam.FieldOfView = HakiOverlay.oldCameraFOV
+
+			end
+
+		end
+
+	end)
+
+	HakiOverlay.cameraHidden = false
+
+	HakiOverlay.oldCameraType = nil
+
+	HakiOverlay.oldCameraSubject = nil
+
+	HakiOverlay.oldCameraCFrame = nil
+
+	HakiOverlay.oldCameraFOV = nil
+
+end
+
+local function refreshHakiStatusLabel()
+
+	local statusText = tostring(HakiOverlay.status or "tweening")
+
+	local kills = tonumber(HakiOverlay.kills) or 0
+
+	local maxKills = tonumber(HakiOverlay.maxKills) or 50
+
+	if HakiOverlay.statusLabel then
+
+		HakiOverlay.statusLabel.Text = "Status: " .. statusText
+
+	end
+
+	if HakiOverlay.killsLabel then
+
+		HakiOverlay.killsLabel.Text = "Yeti killed: " .. tostring(kills) .. " / " .. tostring(maxKills)
+
+	end
+
+end
+
+local function showHakiOverlay()
+
+	hideHakiCamera()
+
+	hideHakiHudBars()
+
+	if HakiOverlay.gui and HakiOverlay.gui.Parent then
+
+		HakiOverlay.gui.Enabled = true
+
+		refreshHakiStatusLabel()
+
+		return
+
+	end
+
+	pcall(function()
+
+		local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+		local oldCore = CoreGui:FindFirstChild("PrinceHubHakiOverlay")
+
+		if oldCore then oldCore:Destroy() end
+
+		local oldPlayer = playerGui:FindFirstChild("PrinceHubHakiOverlay")
+
+		if oldPlayer then oldPlayer:Destroy() end
+
+		local gui = Instance.new("ScreenGui")
+
+		gui.Name = "PrinceHubHakiOverlay"
+
+		gui.IgnoreGuiInset = true
+
+		gui.ResetOnSpawn = false
+
+		gui.DisplayOrder = 1000
+
+		gui.Parent = playerGui
+
+		local bg = Instance.new("Frame")
+
+		bg.Name = "HakiStatusPanel"
+
+		bg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+
+		bg.BackgroundTransparency = 0.25
+
+		bg.BorderSizePixel = 0
+
+		bg.AnchorPoint = Vector2.new(0.5, 0)
+
+		bg.Position = UDim2.fromScale(0.5, 0.04)
+
+		bg.Size = UDim2.fromScale(0.42, 0.16)
+
+		bg.Parent = gui
+
+		local title = Instance.new("TextLabel")
+
+		title.Name = "Title"
+
+		title.BackgroundTransparency = 1
+
+		title.AnchorPoint = Vector2.new(0.5, 0.5)
+
+		title.Position = UDim2.fromScale(0.5, 0.24)
+
+		title.Size = UDim2.fromScale(0.9, 0.28)
+
+		title.Font = Enum.Font.GothamBlack
+
+		title.Text = "Prince Hub"
+
+		title.TextColor3 = Color3.fromRGB(15, 15, 15)
+
+		title.TextScaled = true
+
+		title.Parent = bg
+
+		local statusLabel = Instance.new("TextLabel")
+
+		statusLabel.Name = "Status"
+
+		statusLabel.BackgroundTransparency = 1
+
+		statusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+
+		statusLabel.Position = UDim2.fromScale(0.5, 0.56)
+
+		statusLabel.Size = UDim2.fromScale(0.9, 0.22)
+
+		statusLabel.Font = Enum.Font.GothamSemibold
+
+		statusLabel.TextColor3 = Color3.fromRGB(30, 30, 30)
+
+		statusLabel.TextScaled = true
+
+		statusLabel.Parent = bg
+
+		local killsLabel = Instance.new("TextLabel")
+
+		killsLabel.Name = "Kills"
+
+		killsLabel.BackgroundTransparency = 1
+
+		killsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+
+		killsLabel.Position = UDim2.fromScale(0.5, 0.78)
+
+		killsLabel.Size = UDim2.fromScale(0.9, 0.20)
+
+		killsLabel.Font = Enum.Font.GothamBold
+
+		killsLabel.TextColor3 = Color3.fromRGB(30, 30, 30)
+
+		killsLabel.TextScaled = true
+
+		killsLabel.Parent = bg
+
+		HakiOverlay.gui = gui
+
+		HakiOverlay.statusLabel = statusLabel
+
+		HakiOverlay.killsLabel = killsLabel
+
+		refreshHakiStatusLabel()
+
+	end)
+
+	HakiOverlay.updateLoopID = (HakiOverlay.updateLoopID or 0) + 1
+
+	local loopID = HakiOverlay.updateLoopID
+
+	task.spawn(function()
+
+		while HakiOverlay.gui and HakiOverlay.gui.Parent and HakiOverlay.updateLoopID == loopID do
+
+			local questKills, questMax = getHakiQuestProgress(HakiOverlay.kills or 0)
+
+			HakiOverlay.kills = math.clamp(math.floor(tonumber(questKills) or 0), 0, tonumber(questMax) or 50)
+
+			HakiOverlay.maxKills = math.max(1, math.floor(tonumber(questMax) or 50))
+
+			refreshHakiStatusLabel()
+
+			if HakiOverlay.kills >= HakiOverlay.maxKills then
+
+				hideHakiOverlay()
+
+				break
+
+			end
+
+			task.wait(0.25)
+
+		end
+
+	end)
+
+end
+
+local function setHakiStatus(status)
+
+	status = tostring(status or "tweening")
+
+	if status ~= "killing yeti" and status ~= "taking quest" then
+
+		status = "tweening"
+
+	end
+
+	HakiOverlay.status = status
+
+	refreshHakiStatusLabel()
+
+end
+
+local function setHakiKills(kills, maxKills)
+
+	HakiOverlay.kills = math.clamp(math.floor(tonumber(kills) or 0), 0, tonumber(maxKills) or 50)
+
+	HakiOverlay.maxKills = math.max(1, math.floor(tonumber(maxKills) or 50))
+
+	refreshHakiStatusLabel()
+
+	if HakiOverlay.kills >= HakiOverlay.maxKills then
+
+		task.delay(0.5, function()
+
+			hideHakiOverlay()
+
+		end)
+
+	end
+
+end
+
+hideHakiOverlay = function()
+
+	restoreHakiCamera()
+
+	restoreHakiHudBars()
+
+	pcall(function()
+
+		if HakiOverlay.gui then
+
+			HakiOverlay.gui:Destroy()
+
+		end
+
+	end)
+
+	HakiOverlay.gui = nil
+
+	HakiOverlay.statusLabel = nil
+
+	HakiOverlay.killsLabel = nil
+
+	HakiOverlay.updateLoopID = (HakiOverlay.updateLoopID or 0) + 1
+
+end
+
+-- ============================================================
+
+-- HAKI ANTI-KICK TWEEN
+
+-- Vol lÃ©ger en facemouse au lieu d'une montÃ©e haute :
+
+--   - On grimpe juste un peu au-dessus du Y le plus haut entre dÃ©part/arrivÃ©e
+
+--     (assez pour passer arbres bas et muret, pas un saut suspect)
+
+--   - Mouvement direct vers la cible (pas de waypoint flat Ã  100m d'altitude)
+
+--   - FaceMouse permanent : le perso regarde toujours oÃ¹ il va
+
+--   - Step capÃ© par frame, vitesse rÃ©duite pour la phase Haki
+
+-- ============================================================
+
+local function DoHakiTween(targetPos, hoverY)
+
+	if typeof(targetPos) == "CFrame" then targetPos = targetPos.Position end
+
+	if typeof(targetPos) ~= "Vector3" then return end
+
+	-- Clamp la cible dans la zone Yeti pour ne jamais sortir des limites.
+
+	targetPos = clampToYetiZone(targetPos)
+
+	local rp = getHRP()
+
+	local hum = getHumanoid()
+
+	if not rp or not hum or hum.Health <= 0 then return end
+
+	H.tpToken = H.tpToken + 1
+
+	local myToken = H.tpToken
+
+	local startPos = rp.Position
+
+	local finalPos = hoverY and Vector3.new(targetPos.X, hoverY, targetPos.Z) or targetPos
+
+	finalPos = clampToYetiZone(finalPos)
+
+	-- Hauteur de croisiÃ¨re LÃ‰GÃˆRE : juste assez au-dessus pour passer les
+
+	-- petits obstacles (arbres bas, rochers, muret). On prend le max de Y
+
+	-- entre dÃ©part et arrivÃ©e, et on ajoute 10 studs.
+
+	local cruiseY = math.max(startPos.Y, finalPos.Y) + 10
+
+	if cruiseY < H.YETI_MIN_SAFE_Y then cruiseY = H.YETI_MIN_SAFE_Y end
+
+	if cruiseY > H.YETI_MAX_SAFE_Y - 5 then cruiseY = H.YETI_MAX_SAFE_Y - 5 end
+
+	local flatDist = Vector3.new(finalPos.X - startPos.X, 0, finalPos.Z - startPos.Z).Magnitude
+
+	-- Trajectoire :
+
+	-- - petits dÃ©placements (< 8 studs) : direct vers la cible
+
+	-- - sinon : un seul waypoint Ã  hauteur cruiseY juste au-dessus de la
+
+	--   cible (X/Z de la cible, Y = cruiseY), puis la cible. Comme Ã§a on
+
+	--   "glisse" en pente douce de notre position vers le yeti, sans monter
+
+	--   verticalement Ã  100m+.
+
+	local route = {}
+
+	if flatDist > 8 then
+
+		table.insert(route, Vector3.new(finalPos.X, cruiseY, finalPos.Z))
+
+	end
+
+	table.insert(route, finalPos)
+
+	setNoclip(true)
+
+	releaseMovementKeys()
+
+	-- Vitesse rÃ©duite pour la phase Haki.
+
+	local hakiSpeed = math.min(H.teleportSpeed or 70, 55)
+
+	local MAX_STEP_PER_FRAME = 4
+
+	local lastFaceMouse = 0
+
+	local moving = true
+
+	task.spawn(function()
+
+		while moving and H.tpToken == myToken do
+
+			fireTakeStamDash()
+
+			task.wait(0.1)
+
+		end
+
+	end)
+
+	for wpIndex, wp in ipairs(route) do
+
+		local isLast = wpIndex == #route
+
+		local reachDist = isLast and 2.5 or 4
+
+		while H.tpToken == myToken do
+
+			rp = getHRP()
+
+			hum = getHumanoid()
+
+			if not rp or not hum or hum.Health <= 0 then break end
+
+			local cur = rp.Position
+
+			local toWp = wp - cur
+
+			local d = toWp.Magnitude
+
+			if d <= reachDist then
+
+				rp.AssemblyLinearVelocity = Vector3.zero
+
+				rp.AssemblyAngularVelocity = Vector3.zero
+
+				break
+
+			end
+
+			local dt = RunService.Heartbeat:Wait()
+
+			local step = math.min(hakiSpeed * dt, d, MAX_STEP_PER_FRAME)
+
+			local dir = toWp.Unit
+
+			-- FaceMouse permanent (toutes les ~80ms) pour que la rotation
+
+			-- envoyÃ©e au serveur reste cohÃ©rente avec le dÃ©placement.
+
+			if tick() - lastFaceMouse >= 0.08 then
+
+				lastFaceMouse = tick()
+
+				fireFaceMouse()
+
+			end
+
+			local nextPos = cur + dir * step
+
+			-- Clamp Ã  chaque frame: si un step nous fait sortir, on reste Ã 
+
+			-- la limite. Comme Ã§a mÃªme un dt anormal ne peut pas nous Ã©jecter.
+
+			nextPos = clampToYetiZone(nextPos)
+
+			local lookAt = Vector3.new(nextPos.X + dir.X, nextPos.Y, nextPos.Z + dir.Z)
+
+			rp.CFrame = CFrame.lookAt(nextPos, lookAt)
+
+			rp.AssemblyLinearVelocity = Vector3.zero
+
+			rp.AssemblyAngularVelocity = Vector3.zero
+
+		end
+
+	end
+
+	moving = false
+
+	pcall(function()
+
+		local endRp = getHRP()
+
+		local endHum = getHumanoid()
+
+		if endRp then
+
+			setWaterDiveAssist(endRp, endHum, false, finalPos.Y)
+
+		end
+
+	end)
+
+	releaseMovementKeys()
+
+end
+
+local function phase3Haki()
+
+	if not getgenv().KaitunFarm then return end
+
+	if not configFlag("HAKI", "Buso", true) then
+
+		notify("Kaitun", "Buso Haki disabled by config.", 4)
+
+		return
+
+	end
+
+	setNoclip(true)
+
+	ensureEscapedFishman("Haki")
+
+	if hasHaki() then
+
+		notify("Kaitun", "Haki already owned.", 4)
+
+		return
+
+	end
+
+	notify("Kaitun", "Training Haki...", 5)
+
+	showHakiOverlay()
+
+	setHakiStatus("tweening")
+
+	equipMelee()
+
+	local hakiEquipLoop = true
+
+	task.spawn(function()
+
+		while hakiEquipLoop and getgenv().KaitunFarm and not hasHaki() do
+
+			equipMelee()
+
+			task.wait(0.35)
+
+		end
+
+	end)
+
+	local hakiRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Haki")
+
+	local questName = "Road to Armament"
+
+	local questPos = Vector3.new(-4246.068, 169.782, -2990.422)
+
+	local farmPos = Vector3.new(-4475.706, 80.982, -2964.551)
+
+	local function waitAtHakiSpotIfLowHP()
+
+		local hum = getHumanoid()
+
+		if not hum or hum.Health <= 0 then
+
+			return false
+
+		end
+
+		if hum.Health > (H.HAKI_LOW_HP_THRESHOLD or 100) then
+
+			return false
+
+		end
+
+		setHakiStatus("tweening")
+
+		H.tpToken = H.tpToken + 1
+
+		setNoclip(true)
+
+		releaseMovementKeys()
+
+		DoSafeTeleport(farmPos, false, true)
+
+		local rp = getHRP()
+
+		if rp then
+
+			enableAirHold(rp, farmPos)
+
+		end
+
+		local waitUntil = tick() + (H.HAKI_LOW_HP_WAIT or 8)
+
+		while getgenv().KaitunFarm and not hasHaki() and tick() < waitUntil do
+
+			rp = getHRP()
+
+			if rp then
+
+				enableAirHold(rp, farmPos)
+
+				rp.CFrame = CFrame.new(farmPos)
+
+				rp.AssemblyLinearVelocity = Vector3.zero
+
+				rp.AssemblyAngularVelocity = Vector3.zero
+
+			end
+
+			task.wait(0.2)
+
+		end
+
+		return true
+
+	end
+
+	local hakiQuestTried = false
+
+	if getQuest() ~= questName then
+
+		cancelQuestIfDifferent(questName)
+
+		setHakiStatus("tweening")
+
+		DoSafeTeleport(questPos, false, true)
+
+		task.wait(1)
+
+		if getQuest() ~= questName then
+
+			hakiQuestTried = true
+
+			setHakiStatus("taking quest")
+
+			pcall(function()
+
+				questEvent:InvokeServer({ [1] = "takequest", [2] = questName })
+
+			end)
+
+			task.wait(1)
+
+		end
+
+	end
+
+	setHakiStatus("tweening")
+
+	DoSafeTeleport(farmPos, false, true)
+
+	task.wait(0.5)
+
+	-- Synchronise immÃ©diatement le compteur avec la progression cÃ´tÃ© serveur
+
+	-- (utile quand la quÃªte a dÃ©jÃ  des kills enregistrÃ©s, ex. aprÃ¨s un relog).
+
+	local initialKills, initialMax = getHakiQuestProgress(0)
+
+	local kills = initialKills or 0
+
+	setHakiKills(kills, initialMax or 50)
+
+	while getgenv().KaitunFarm and not hasHaki() and kills < 50 do
+
+		local questKills, questMax = getHakiQuestProgress(kills)
+
+		kills = math.max(kills, questKills or 0)
+
+		setHakiKills(kills, questMax or 50)
+
+		if kills >= (questMax or 50) then
+
+			hideHakiOverlay()
+
+			break
+
+		end
+
+		if waitAtHakiSpotIfLowHP() then
+
+			continue
+
+		end
+
+		if markDeathGraceIfNeeded() then
+
+			notify("Kaitun", "Death detected. Waiting 5s before any movement...", 6)
+
+			setHakiStatus("respawning")
+
+			H.tpToken = H.tpToken + 1
+
+			setNoclip(false)
+
+			releaseMovementKeys()
+
+			task.wait(5)
+
+			waitUntilAliveStable(5)
+
+			releaseMovementKeys()
+
+			if not getgenv().KaitunFarm or hasHaki() then break end
+
+			if isOnFishmanIsland() then
+
+				ensureEscapedFishman("Haki respawn")
+
+				if not getgenv().KaitunFarm or hasHaki() then break end
+
+			end
+
+			-- Tween de retour vers Yeti Island, jamais d'instant TP.
+
+			setNoclip(true)
+
+			setHakiStatus("tweening")
+
+			DoSafeTeleport(farmPos, false, true)
+
+			task.wait(0.5)
+
+			continue
+
+		end
+
+		if isOnFishmanIsland() then
+
+			setHakiStatus("respawning")
+
+			ensureEscapedFishman("Haki respawn")
+
+			if not getgenv().KaitunFarm or hasHaki() then break end
+
+			setHakiStatus("tweening")
+
+			DoSafeTeleport(farmPos, false, true)
+
+			task.wait(0.5)
+
+			continue
+
+		end
+
+		if getQuest() ~= questName and not hakiQuestTried then
+
+			hakiQuestTried = true
+
+			cancelQuestIfDifferent(questName)
+
+			setHakiStatus("tweening")
+
+			DoSafeTeleport(questPos, false, true)
+
+			task.wait(1)
+
+			setHakiStatus("taking quest")
+
+			pcall(function()
+
+				questEvent:InvokeServer({ [1] = "takequest", [2] = questName })
+
+			end)
+
+			task.wait(1)
+
+			setHakiStatus("tweening")
+
+			DoSafeTeleport(farmPos, false, true)
+
+		end
+
+		setNoclip(true)
+
+		equipMelee()
+
+		pcall(function() hakiRemote:FireServer("Buso") end)
+
+		if tick() < (H.respawnGraceUntil or 0) then
+
+			releaseMovementKeys()
+
+			task.wait(0.5)
+
+			continue
+
+		end
+
+		local yeti = getClosestYeti()
+
+		if not yeti then
+
+			if isOnFishmanIsland() then
+
+				setHakiStatus("respawning")
+
+				ensureEscapedFishman("Haki no Yeti")
+
+				if not getgenv().KaitunFarm or hasHaki() then break end
+
+			end
+
+			setHakiStatus("tweening")
+
+			DoSafeTeleport(farmPos, false, true)
+
+			task.wait(2)
+
+			continue
+
+		end
+
+		local hrp = yeti:FindFirstChild("HumanoidRootPart")
+
+		if hrp then
+
+			if hrp.Position.Y < H.YETI_MIN_SAFE_Y or hrp.Position.Y > H.YETI_MAX_SAFE_Y then
+
+				task.wait(0.5)
+
+				continue
+
+			end
+
+			-- Tween simple de yeti en yeti (pas d'instant TP, pas d'arc).
+
+			setHakiStatus("tweening")
+
+			local hoverPos = Vector3.new(hrp.Position.X, hrp.Position.Y + (H.YETI_HOVER_HEIGHT or 8.3), hrp.Position.Z)
+
+			DoHakiTween(hoverPos)
+
+			setHakiStatus("killing yeti")
+
+			local killed = attackYeti(yeti)
+
+			if waitAtHakiSpotIfLowHP() then
+
+				continue
+
+			end
+
+			if killed then
+
+				kills = kills + 1
+
+				local questKills2, qmax2 = getHakiQuestProgress(kills)
+
+				kills = math.max(kills, questKills2 or kills)
+
+				setHakiKills(kills, qmax2 or 50)
+
+			end
+
+		end
+
+		task.wait(0.21)
+
+	end
+
+	hakiEquipLoop = false
+
+	setNoclip(false)
+
+	hideHakiOverlay()
+
+end
+
+-- ============================================================
+
+-- PHASE 4: WORLD SCROLL
+
+-- ============================================================
+
+local function phase4WorldScroll()
+
+	if not getgenv().KaitunFarm then return end
+
+	if not configFlag("ITEM", "World Scroll", true) then
+
+		notify("Kaitun", "World Scroll disabled by config.", 4)
+
+		return
+
+	end
+
+	ensureEscapedFishman("World Scroll")
+
+	if hasWorldScroll() then
+
+		notify("Kaitun", "World Scroll already owned.", 4)
+
+		return
+
+	end
+
+	local scrollPos = Vector3.new(-7348.136, 3.274, -14951.547)
+
+	local attempts = 0
+
+	while getgenv().KaitunFarm and not hasWorldScroll() do
+
+		attempts = attempts + 1
+
+		if markDeathGraceIfNeeded() then
+
+			notify("World Scroll", "Death detected. Waiting 10s, then retrying World Scroll...", 6)
+
+			H.tpToken = H.tpToken + 1
+
+			setNoclip(false)
+
+			releaseMovementKeys()
+
+			task.wait(10)
+
+			waitUntilAliveStable(5)
+
+			releaseMovementKeys()
+
+		end
+
+		if isOnFishmanIsland() then
+
+			ensureEscapedFishman("World Scroll respawn")
+
+			if not getgenv().KaitunFarm then break end
+
+		end
+
+		if hasWorldScroll() then break end
+
+		notify("Kaitun", "Getting World Scroll... Attempt " .. tostring(attempts), 5)
+
+		DoSafeTeleport(scrollPos)
+
+		task.wait(0.5)
+
+		if markDeathGraceIfNeeded() then
+
+			notify("World Scroll", "Died during World Scroll path. Retrying after respawn...", 6)
+
+			H.tpToken = H.tpToken + 1
+
+			setNoclip(false)
+
+			releaseMovementKeys()
+
+			task.wait(10)
+
+			waitUntilAliveStable(5)
+
+			releaseMovementKeys()
+
+			continue
+
+		end
+
+		pcall(function()
+
+			VirtualInput:SendKeyEvent(true, Enum.KeyCode.LeftAlt, false, game)
+
+			task.wait(3)
+
+			VirtualInput:SendKeyEvent(false, Enum.KeyCode.LeftAlt, false, game)
+
+		end)
+
+		task.wait(1)
+
+	end
+
+	if hasWorldScroll() then
+
+		notify("Kaitun", "World Scroll obtained.", 5)
+
+	else
+
+		notify("Kaitun", "World Scroll not confirmed. Staying in World Scroll phase, no main menu.", 8)
+
+		getgenv().KaitunFarm = false
+
+	end
+
+end
+
+-- ============================================================
+
+-- PHASE 5: MAIN MENU THEN SEA 2
+
+-- ============================================================
+
+local function phase5MainMenuSea2()
+
+	if not getgenv().KaitunFarm then return end
+
+	if configFlag("ITEM", "World Scroll", true) and not hasWorldScroll() then
+
+		notify("Kaitun", "World Scroll not in inventory. Main menu blocked.", 8)
+
+		getgenv().KaitunFarm = false
+
+		return
+
+	end
+
+	local code = getActivePSCode()
+
+	if code == "" then
+
+		notify("Kaitun Sea 2", "No PS code set. Main menu blocked.", 8)
+
+		getgenv().KaitunFarm = false
+
+		return
+
+	end
+
+	savePSCode(code)
+
+	getgenv().KaitunSea2Code = code
+
+	getgenv().KaitunSea2Pending = true
+
+	notify("Kaitun", "Going main menu for Sea 2...", 5)
+
+	task.wait(1)
+
+	pcall(function()
+
+		TeleportService:Teleport(LOGIN_PLACE_ID, LocalPlayer)
+
+	end)
+
+end
+
+-- ============================================================
+
+-- SEA 2 FARM: CRAZY WOLF TO 675
+
+-- ============================================================
+
+local S2 = { running = false, loopID = 0, upHeight = 9, canAttack = true }
+
+local function setSea2Spawn()
+
+	local setSpawnRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("SetSpawn")
+
+	local spawnPos = Vector3.new(7319.132, 21.723, 10561.868)
+
+	DoSafeTeleport(spawnPos)
+
+	task.wait(1)
+
+	pcall(function() setSpawnRemote:FireServer() end)
+
+	task.wait(0.5)
+
+end
+
+local function getCrazyWolvesNear(pos, radius)
+
+	local result = {}
+
+	radius = radius or 22
+
+	for _, d in ipairs(getAllNPCs("Crazy Wolf")) do
+
+		if d.hrp and (d.hrp.Position - pos).Magnitude <= radius then
+
+			table.insert(result, d)
+
+		end
+
+	end
+
+	return result
+
+end
+
+local function attackWolf(wolf)
+
+	if not S2.canAttack then return end
+
+	local hum = wolf and wolf:FindFirstChild("Humanoid")
+
+	local hrp = wolf and wolf:FindFirstChild("HumanoidRootPart")
+
+	if not hum or hum.Health <= 0 or not hrp then return end
+
+	S2.canAttack = false
+
+	equipMelee()
+
+	local lockActive = true
+
+	local lockConn = RunService.Heartbeat:Connect(function()
+
+		if not lockActive then return end
+
+		local liveHrp = wolf and wolf:FindFirstChild("HumanoidRootPart")
+
+		local liveHum = wolf and wolf:FindFirstChild("Humanoid")
+
+		local rp = getHRP()
+
+		local selfHum = getHumanoid()
+
+		if not liveHrp or not liveHum or liveHum.Health <= 0 or not rp or not selfHum or selfHum.Health <= 0 then
+
+			return
+
+		end
+
+		setNoclip(true)
+
+		local standPos = Vector3.new(liveHrp.Position.X, liveHrp.Position.Y + S2.upHeight, liveHrp.Position.Z)
+
+		enableAirHold(rp, standPos)
+
+		selfHum.AutoRotate = false
+
+		selfHum.PlatformStand = false
+
+		selfHum.Sit = false
+
+		rp.CFrame = CFrame.new(standPos)
+
+		rp.AssemblyLinearVelocity = Vector3.zero
+
+		rp.AssemblyAngularVelocity = Vector3.zero
+
+	end)
+
+	for combo = 1, 5 do
+
+		if not getgenv().Sea2Farm then break end
+
+		hrp = wolf:FindFirstChild("HumanoidRootPart")
+
+		hum = wolf:FindFirstChild("Humanoid")
+
+		local rp = getHRP()
+
+		if not hrp or not hum or hum.Health <= 0 or not rp then break end
+
+		local npcPos = hrp.Position
+
+		local standPos = Vector3.new(npcPos.X, npcPos.Y + S2.upHeight, npcPos.Z)
+
+		enableAirHold(rp, standPos)
+
+		rp.CFrame = CFrame.new(standPos)
+
+		rp.AssemblyLinearVelocity = Vector3.zero
+
+		rp.AssemblyAngularVelocity = Vector3.zero
+
+		local hrpList = {}
+
+		local npcIDs = {}
+
+		for _, d in ipairs(getCrazyWolvesNear(npcPos, 22)) do
+
+			table.insert(hrpList, d.hrp)
+
+			local id = getNPCID(d.npc)
+
+			if id then table.insert(npcIDs, id) end
+
+		end
+
+		if #hrpList == 0 then
+
+			table.insert(hrpList, hrp)
+
+			local id = getNPCID(wolf)
+
+			if id then table.insert(npcIDs, id) end
+
+		end
+
+		pcall(function()
+
+			local current = getHRP()
+
+			local liveHrp = wolf and wolf:FindFirstChild("HumanoidRootPart")
+
+			if current and liveHrp then
+
+				local liveStandPos = Vector3.new(liveHrp.Position.X, liveHrp.Position.Y + S2.upHeight, liveHrp.Position.Z)
+
+				enableAirHold(current, liveStandPos)
+
+				current.CFrame = CFrame.new(liveStandPos)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			end
+
+			combatRegister:InvokeServer({
+
+				[1] = "swingsfx", [2] = "Melee", [3] = combo,
+
+				[4] = "Ground", [5] = false, [6] = CombatAnims[combo],
+
+				[7] = combo == 1 and 2 or 1.75, [8] = 1.5,
+
+			})
+
+			current = getHRP()
+
+			liveHrp = wolf and wolf:FindFirstChild("HumanoidRootPart")
+
+			if current and liveHrp then
+
+				local liveStandPos = Vector3.new(liveHrp.Position.X, liveHrp.Position.Y + S2.upHeight, liveHrp.Position.Z)
+
+				enableAirHold(current, liveStandPos)
+
+				current.CFrame = CFrame.new(liveStandPos)
+
+				current.AssemblyLinearVelocity = Vector3.zero
+
+				current.AssemblyAngularVelocity = Vector3.zero
+
+			end
+
+			local packet = {
+
+				[1] = {
+
+					[1] = "damage", [2] = hrpList, [3] = "Melee",
+
+					[4] = { combo, "Ground", "Melee" }, [5] = true,
+
+					[6] = current and current.CFrame or rp.CFrame,
+
+					aircombo = "Ground",
+
+				}
+
+			}
+
+			if #npcIDs > 0 then packet[1].NPCIDs = npcIDs end
+
+			combatRegister:InvokeServer(unpack(packet))
+
+		end)
+
+		task.wait(0.21)
+
+	end
+
+	lockActive = false
+
+	if lockConn then lockConn:Disconnect() end
+
+	local humEnd = getHumanoid()
+
+	if humEnd then
+
+		humEnd.AutoRotate = true
+
+	end
+
+	disableAirHold()
+
+	task.wait(1)
+
+	S2.canAttack = true
+
+end
+
+function H.startSea2Farm()
+
+	if S2.running then return end
+
+	if not IS_SEA2_PLACE then
+
+		startAutoJoinSea2(getActivePSCode())
+
+		return
+
+	end
+
+	-- Ne pas verifier PrivateServerId ici: le retour main menu est gere uniquement
+
+	-- par le flag Fatal Error / 267 dans shouldForceMainMenuFromCurrentPlace().
+
+	S2.running = true
+
+	S2.loopID = S2.loopID + 1
+
+	local loopID = S2.loopID
+
+	getgenv().Sea2Farm = true
+
+	H.autoAdsEnabled = true
+
+	H.autoStatsEnabled = true
+
+	setNoclip(true)
+
+	H.teleportSpeed = DefaultConfig.MAIN.TWEEN_SPEED or 70
+
+	notify("Sea 2", "Crazy Wolf farm started.", 5)
+
+	task.spawn(function()
+
+		setSea2Spawn()
+
+		local questName = "Help PJ"
+
+		local questPos = Vector3.new(7121.167, 56.273, 10553.389)
+
+		local center = Vector3.new(7319.132, 21.723, 10561.868)
+
+		local maxLevel = DefaultConfig.MAIN.LEVEL or 675
+
+		while getgenv().Sea2Farm and S2.loopID == loopID do
+
+			if not isAlive() then task.wait(0.5) continue end
+
+			if getLevel() >= maxLevel then
+
+				notify("Sea 2", "Level " .. tostring(maxLevel) .. " reached.", 6)
+
+				break
+
+			end
+
+			equipMelee()
+
+			if getQuest() ~= questName and getLevel() >= 425 then
+
+				takeQuest(questName, questPos)
+
+				task.wait(0.5)
+
+				continue
+
+			end
+
+			local wolf = getClosestNPC("Crazy Wolf")
+
+			local rp = getHRP()
+
+			if not rp then task.wait(0.5) continue end
+
+			if not wolf then
+
+				local centerPos = Vector3.new(center.X, center.Y + S2.upHeight, center.Z)
+
+				if (rp.Position - centerPos).Magnitude > 8 then
+
+					DoSafeTeleport(centerPos, true)
+
+				end
+
+				task.wait(0.5)
+
+				continue
+
+			end
+
+			local hrp = wolf:FindFirstChild("HumanoidRootPart")
+
+			if hrp then
+
+				local standPos = Vector3.new(hrp.Position.X, hrp.Position.Y + S2.upHeight, hrp.Position.Z)
+
+				if (rp.Position - standPos).Magnitude > 8 then
+
+					DoSafeTeleport(standPos, true)
+
+				end
+
+				task.wait(0.03)
+
+				attackWolf(wolf)
+
+			end
+
+			task.wait(0.21)
+
+		end
+
+		getgenv().Sea2Farm = false
+
+		S2.running = false
+
+		H.autoAdsEnabled = false
+
+		H.autoStatsEnabled = false
+
+		notify("Sea 2", "Farm stopped.", 4)
+
+	end)
+
+end
+
+function H.stopSea2Farm()
+
+	getgenv().Sea2Farm = false
+
+	S2.running = false
+
+	S2.loopID = S2.loopID + 1
+
+	S2.canAttack = true
+
+	H.tpToken = H.tpToken + 1
+
+end
+
+-- ============================================================
+
+-- AUTO KAITUN MAIN FLOW
+
+-- ============================================================
+
+local KT = { running = false, loopID = 0 }
+
+function H.startKaitunFarm()
+
+	if KT.running then return end
+
+	notify("Kaitun", "Start clicked | Level: " .. tostring(getLevel()) .. " | PlaceId: " .. tostring(game.PlaceId), 5)
+
+	if IS_LOGIN_PLACE then
+
+		startAutoJoinSea2(getActivePSCode())
+
+		return
+
+	end
+
+	KT.running = true
+
+	KT.loopID = KT.loopID + 1
+
+	getgenv().KaitunFarm = true
+
+	startUtilityLoops()
+
+	H.autoAdsEnabled = true
+
+	H.autoStatsEnabled = true
+
+	setNoclip(true)
+
+	H.teleportSpeed = DefaultConfig.MAIN.TWEEN_SPEED or 70
+
+	task.spawn(function()
+
+		local ok, err = pcall(function()
+
+			if shouldForceMainMenuFromCurrentPlace() then
+
+				teleportToMainMenuForPS()
+
+				return
+
+			end
+
+			if IS_SEA2_PLACE then
+
+				H.startSea2Farm()
+
+				while KT.running and getgenv().Sea2Farm do
+
+					if getLevel() >= (DefaultConfig.MAIN.LEVEL or 675) then
+
+						H.stopSea2Farm()
+
+						break
+
+					end
+
+					task.wait(3)
+
+				end
+
+			else
+
+				local level = getLevel()
+
+				notify("Kaitun", "Main flow running | Level: " .. tostring(level), 5)
+
+				if level < 425 then
+
+					notify("Kaitun", "Level < 425, starting Fishman farm.", 5)
+
+					phase1FishmanFarm()
+
+				else
+
+					notify("Kaitun", "Level >= 425, skipping Fishman farm.", 5)
+
+				end
+
+				if KT.running and configFlag("STYLE", "Geppo", true) then
+
+					getgenv().KaitunFarm = true
+
+					ensureEscapedFishman("Before Geppo")
+
+					phase2Geppo()
+
+				end
+
+				if KT.running and configFlag("HAKI", "Buso", true) then
+
+					getgenv().KaitunFarm = true
+
+					ensureEscapedFishman("Before Haki")
+
+					phase3Haki()
+
+				end
+
+				if KT.running and configFlag("ITEM", "World Scroll", true) then
+
+					getgenv().KaitunFarm = true
+
+					ensureEscapedFishman("Before World Scroll")
+
+					phase4WorldScroll()
+
+				end
+
+				if KT.running then
+
+					getgenv().KaitunFarm = true
+
+					phase5MainMenuSea2()
+
+				end
+
+			end
+
+		end)
+
+		KT.running = false
+
+		getgenv().KaitunFarm = false
+
+		H.autoAdsEnabled = false
+
+		H.autoStatsEnabled = false
+
+		releaseMovementKeys()
+
+		if ok then
+
+			notify("Kaitun", "Stopped.", 4)
+
+		else
+
+			notify("Kaitun ERROR", tostring(err), 10)
+
+		end
+
+	end)
+
+end
+
+function H.stopKaitunFarm()
+
+	KT.running = false
+
+	getgenv().KaitunFarm = false
+
+	H.autoAdsEnabled = false
+
+	H.autoStatsEnabled = false
+
+	H.tpToken = H.tpToken + 1
+
+	if H.stopSea2Farm then H.stopSea2Farm() end
+
+	releaseMovementKeys()
+
+	notify("Kaitun", "Stopped manually.", 4)
+
+end
+
+-- ============================================================
+
+-- BOOT
+
+-- ============================================================
+
+startUtilityLoops()
+
+notify("Prince Hub", "Kaitun-only loaded.", 4)
+
+if DefaultConfig.MAIN.AUTO_JOIN_SEA2 or getgenv().KaitunSea2Pending then
+
+	task.spawn(function()
+
+		task.wait(3)
+
+		local code = getActivePSCode()
+
+		if IS_LOGIN_PLACE then
+
+			clearMainMenuAfterRejoin()
+
+			startAutoJoinSea2(code)
+
+		elseif shouldForceMainMenuFromCurrentPlace() then
+
+			teleportToMainMenuForPS()
+
+			return
+
+		elseif IS_SEA2_PLACE then
+
+			getgenv().KaitunSea2Pending = false
+
+			H.startSea2Farm()
+
+		end
+
+	end)
+
+end
+
+if DefaultConfig.MAIN.AUTO_KAITUN then
+
+	task.spawn(function()
+
+		task.wait(2)
+
+		H.startKaitunFarm()
+
+	end)
+
+end
+
+getgenv().PrinceKaitunOnly = H
