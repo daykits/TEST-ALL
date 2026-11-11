@@ -62,7 +62,7 @@ local t1 = {
 }
 
 v4("System", "Loading Rayfield Gen2...", t1.value6)
-v4("System", "Script by fts9999! Report Bug In Discord", 10, "Discord", function(p7)
+v4("System", "Script by DAYKITS! Report Bug In Discord", 10, "Discord", function(p7)
 	if p7 ~= "Discord" then
 		return
 	end
@@ -471,7 +471,7 @@ else
 	function t1.value17()
 		return t5.value1:CreateWindow({
 			name = "Lethal Ape | Update",
-			subtitle = "by fts9999",
+			subtitle = "by daykits",
 			sidebarLayout = true
 		})
 	end
