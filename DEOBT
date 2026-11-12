@@ -29,7 +29,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/scriptpastebin/Blox-F
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloxfruitsnokey/Banana/refs/heads/main/Koko/ui.luau"))()
 local v5 = lib:CreateWindow({
 	Title = "Koko Hub",
-	Subtitle = "discord.gg/pKS6qzcaqB",
+	Subtitle = "by DEOBT",
 	Image = "rbxassetid://118179630608358"
 })
 local t1 = {
