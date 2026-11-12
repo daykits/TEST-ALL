@@ -24,7 +24,7 @@ local function geniter(f, s, c)
 	end
 end
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/scriptpastebin/Blox-Fruits/refs/heads/main/core.luau"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/TEST-ALL/refs/heads/main/cc"))()
 
 local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloxfruitsnokey/Banana/refs/heads/main/Koko/ui.luau"))()
 local v5 = lib:CreateWindow({
