@@ -30,7 +30,7 @@ local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloxfruit
 local v5 = lib:CreateWindow({
 	Title = "Koko Hub",
 	Subtitle = "by DEOBT",
-	Image = "rbxassetid://118179630608358"
+	Image = "rbxassetid://98702882919451"
 })
 local t1 = {
 	Info = v5:AddTab("Info And Status"),
@@ -4752,6 +4752,6 @@ end
 lib:Notify({
 	Title = "Koko Hub",
 	Description = "Koko Hub comeback",
-	Icon = "rbxassetid://118179630608358",
+	Icon = "rbxassetid://98702882919451",
 	Duration = 5
 })
