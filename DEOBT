@@ -1,1 +1,4297 @@
+-- discord.gg/syncrypt
 
+local function geniter(f, s, c)
+	if type(f) ~= "function" then
+		local mt = getmetatable(f)
+
+		if type(mt) == "table" and mt.__iter then
+			f, s, c = mt.__iter(f)
+		elseif type(f) == "table" then
+			f, s, c = next, f, nil
+		end
+	end
+
+	return function()
+		local r = table.pack(f(s, c))
+
+		if r[1] == nil then
+			return false
+		end
+
+		c = r[1]
+
+		return true, table.unpack(r, 1, r.n)
+	end
+end
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local genv = type(getgenv) == "function" and getgenv() or _G
+
+if genv.NightPvp and genv.NightPvp.Unload then
+	pcall(genv.NightPvp.Unload)
+	task.wait(0.25)
+end
+
+local t1 = {
+	Name = "Night Hub",
+	Game = "Blox Fruits PvP",
+	Build = "1.0"
+}
+local u11 = true
+local t2 = {}
+local t3 = {}
+local CurrentCamera = workspace.CurrentCamera
+local mouse = LocalPlayer:GetMouse()
+local gethui_ = rawget(genv, "gethui")
+local u17
+local u18
+local u19
+local Unit
+local u21
+local u22
+local Position
+local Unit2
+local u25 = false
+local u26 = false
+local u27 = false
+local t4 = {
+	pickMode = "Smart",
+	smartHp = 50,
+	part = "Head",
+	useFov = true,
+	fov = 160,
+	maxDist = 1500,
+	pred = 0.1,
+	speed = false,
+	speedValue = 80,
+	jumpOn = false,
+	jumpValue = 80,
+	noclip = false,
+	noStun = false,
+	moverFilter = "Smart",
+	fly = false,
+	flyKey = "None",
+	flyMode = "Smart",
+	engageDist = 8,
+	engageEdge = 10,
+	retreatHp = 40,
+	gankRange = 60,
+	autoSkill = false,
+	skillKeys = {
+		Z = true,
+		X = true,
+		C = true,
+		V = true
+	},
+	skillRange = 60,
+	skillHold = 0.1,
+	skillGap = 0.35,
+	flySpeed = 200,
+	flySafe = 180,
+	flyDist = 10,
+	flyUp = 8,
+	kiteDist = 25,
+	kiteSway = 6,
+	antiAim = false,
+	antiAimPower = 200,
+	dodge = false,
+	dodgeRange = 25,
+	dodgeDist = 14,
+	dodgeCd = 1.5,
+	orbitRadius = 12,
+	orbitSpeed = 2.5,
+	flyNoclip = true,
+	hitbox = false,
+	hitboxSize = 12,
+	hitboxShow = true,
+	autoGun = false,
+	gunPick = "Dragonstorm",
+	gunRange = 150,
+	gunRate = 0.35,
+	gunSkills = false,
+	gunBack = true,
+	escape = false,
+	escapeHp = 25,
+	escapeUp = 250,
+	killNote = true,
+	teamCheck = true,
+	wallCheck = false,
+	skipFriends = false,
+	lockKey = "T",
+	aimbot = false,
+	aimTrigger = "Hold right mouse",
+	aimKey = "Q",
+	smooth = 0.25,
+	silent = false,
+	chance = 100,
+	aura = false,
+	auraAll = true,
+	auraRange = 55,
+	auraRate = 0.12,
+	auraWeapon = "Keep current",
+	buso = false,
+	ken = false,
+	race = false,
+	stick = false,
+	stickUp = 6,
+	stickBack = 3,
+	stickRange = 150,
+	spectate = false,
+	infJump = false,
+	antiAfk = true,
+	esp = false,
+	box = true,
+	name = true,
+	info = true,
+	bar = true,
+	hpText = true,
+	chams = false,
+	tracer = false,
+	tracerFrom = "Bottom",
+	espDist = 3000,
+	espColor = "White",
+	teamColor = false,
+	showFov = true,
+	tgtLine = true,
+	lineFrom = "Character",
+	tgtMark = true,
+	tgtColor = "Red"
+}
+local t5 = {
+	White = Color3.fromRGB(240, 240, 240),
+	Red = Color3.fromRGB(255, 70, 70),
+	Green = Color3.fromRGB(80, 230, 120),
+	Blue = Color3.fromRGB(80, 160, 255),
+	Yellow = Color3.fromRGB(255, 215, 70),
+	Purple = Color3.fromRGB(180, 110, 255),
+	Cyan = Color3.fromRGB(70, 220, 230)
+}
+local t6 = {
+	"White",
+	"Red",
+	"Green",
+	"Blue",
+	"Yellow",
+	"Purple",
+	"Cyan"
+}
+
+Aura = {
+	swings = 0,
+	note = "Off"
+}
+Move = {
+	on = false,
+	clip = {}
+}
+Gun = {
+	shots = 0,
+	note = "Off",
+	aimUntil = 0
+}
+Fly = {
+	note = "Off",
+	slowUntil = 0,
+	rubber = 0,
+	angle = 0,
+	step = 0
+}
+Hit = {
+	orig = {}
+}
+Esp = {
+	pool = {}
+}
+UI = {}
+bind = function(p1)
+	t2[#t2 + 1] = p1
+
+	return p1
+end
+spin = function(p2, p3, p4)
+	local function v31()
+		local v32
+
+		while u11 do
+			local ok, result, result2 = pcall(p4)
+			local v36 = not ok
+			local v37, v38, v39
+
+			if v36 then
+				local v40 = result
+
+				v37 = result
+				v38 = result2
+				v39 = v40
+			else
+				v37 = result
+				v38 = result2
+				v39 = v36
+			end
+
+			local v41
+
+			if v39 then
+				v41 = v39
+			else
+				v41 = v37 == false and v38
+			end
+
+			v41 = v41 or nil
+
+			local v42 = v41
+			local v43
+
+			if v42 then
+				local v44 = v41 ~= v32
+
+				v32 = v41
+				v43 = v44
+			else
+				v32 = v41
+				v43 = v42
+			end
+
+			if v43 then
+				local warn_ = warn
+				local v46 = ("! %*: %*"):format(p2, v32)
+
+				warn_(v46)
+			end
+
+			local wait = task.wait
+
+			wait(type(p3) == "function" and p3() or p3)
+		end
+	end
+
+	task.spawn(v31)
+end
+alive = function(p5)
+	local Character = p5 and p5.Character
+	local v49
+
+	if Character then
+		local v50 = Character
+
+		Character = Character:FindFirstChildOfClass("Humanoid")
+		v49 = v50
+	else
+		v49 = Character
+	end
+
+	local HumanoidRootPart = v49 and v49:FindFirstChild("HumanoidRootPart")
+
+	if Character and HumanoidRootPart and not (Character.Health <= 0) then
+		return v49, Character, HumanoidRootPart
+	end
+end
+friendly = function(p6)
+	if t4.teamCheck and LocalPlayer.Team and p6.Team == LocalPlayer.Team and LocalPlayer.Team.Name == "Marines" then
+		return true
+	end
+
+	return t4.skipFriends and t3[p6.UserId] == true
+end
+foe = function(p7)
+	if p7 == LocalPlayer or friendly(p7) then
+		return
+	end
+
+	return alive(p7)
+end
+befriend = function(p8)
+	if p8 == LocalPlayer then
+		return
+	end
+
+	local function v52()
+		local ok, result = pcall(LocalPlayer.IsFriendsWith, LocalPlayer, p8.UserId)
+		local v55 = t3
+		local UserId = p8.UserId
+		local v57 = ok
+		local v58, v59, v60
+
+		if v57 then
+			local v61 = result
+
+			v58 = v55
+			v59 = UserId
+			v60 = v61
+		else
+			v58 = v55
+			v59 = UserId
+			v60 = v57
+		end
+
+		v58[v59] = v60 or nil
+	end
+
+	task.spawn(v52)
+end
+keyName = function(p9)
+	return typeof(p9) == "EnumItem" and p9.Name or tostring(p9)
+end
+keyDown = function(p10)
+	local function v62()
+		return Enum.KeyCode[p10]
+	end
+
+	local ok, result = pcall(v62)
+
+	if ok then
+		ok = UserInputService:IsKeyDown(result)
+	end
+
+	return ok
+end
+
+local raycastParams = RaycastParams.new()
+
+raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+seen = function(p11, p12)
+	raycastParams.FilterDescendantsInstances = {
+		LocalPlayer.Character,
+		p11
+	}
+
+	local Position2 = CurrentCamera.CFrame.Position
+
+	return workspace:Raycast(Position2, p12.Position - Position2, raycastParams) == nil
+end
+pick = function()
+	local _, _, v69 = alive(LocalPlayer)
+
+	if not v69 then
+		return
+	end
+
+	local v70 = v69
+
+	if u21 then
+		local v71, _, v73 = foe(u21)
+
+		if v71 then
+			local v74 = v73
+			local v75 = u21
+			local v76 = v71:FindFirstChild(t4.part)
+			local v77
+
+			if v76 then
+				v74 = v76
+				v77 = v75
+			else
+				v77 = v75
+			end
+
+			return v77, v74
+		end
+
+		u21 = nil
+	end
+
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local v79
+	local v80
+	local v81, v82, v83 = ipairs(Players:GetPlayers())
+	local v84
+	local v85
+	local v86
+	local v87
+	local v88 = geniter(v81, v82, v83)
+
+	while true do
+		local v89 = table.pack(v88())
+
+		if not v89[1] then
+			break
+		end
+
+		local v90 = (v89[2])[2]
+		local v91, v92, v93 = foe(v90)
+
+		if v91 then
+			local v94 = v88
+			local v95 = v79
+			local v96 = v80
+			local v97 = v92
+			local v98 = v93
+			local v99 = v91
+			local v100 = v94
+			local v101 = v95
+			local v102 = v96
+			local v103 = v99:FindFirstChild(t4.part) or v98
+			local Magnitude = (v98.Position - v70.Position).Magnitude
+			local v105, v106 = CurrentCamera:WorldToViewportPoint(v103.Position)
+			local v107, v108, Magnitude2
+
+			if v106 then
+				local v110 = v97
+
+				v107 = v99
+				v108 = v110
+				Magnitude2 = (Vector2.new(v105.X, v105.Y) - mouseLocation).Magnitude
+			else
+				local v111 = v97
+
+				v107 = v99
+				v108 = v111
+				Magnitude2 = v106
+			end
+
+			local v112, v113, v114, huge
+
+			if Magnitude2 then
+				local v116 = Magnitude2
+
+				v112 = v100
+				v113 = v101
+				v114 = v102
+				huge = v116
+			else
+				v112 = v100
+				v113 = v101
+				v114 = v102
+				huge = math.huge
+			end
+
+			local v117 = Magnitude <= t4.maxDist
+			local v118
+
+			if v117 then
+				local v119 = not t4.useFov
+				local v120, v121, v122, v123
+
+				if v119 then
+					local v124 = v112
+					local v125 = v113
+					local v126 = v114
+
+					v120 = v119
+					v121 = v124
+					v122 = v125
+					v123 = v126
+				else
+					local v127 = v112
+					local v128 = v113
+					local v129 = v114
+
+					v120 = huge <= t4.fov
+					v121 = v127
+					v122 = v128
+					v123 = v129
+				end
+
+				if v120 then
+					local v130 = v120
+
+					v112 = v121
+					v113 = v122
+					v114 = v123
+					v118 = v130
+				else
+					v112 = v121
+					v113 = v122
+					v114 = v123
+					v118 = t4.fly and v90 == u17
+				end
+			else
+				v118 = v117
+			end
+
+			local v131, v132
+
+			if t4.pickMode == "Smart" then
+				local v133 = smart(Magnitude, v108, huge)
+
+				v131 = v118
+				v132 = v133
+			else
+				local v134 = t4.pickMode == "Nearest cursor"
+				local v135, v136, v137, v138
+
+				if v134 then
+					local v139 = v112
+
+					v135 = huge
+
+					local v140 = v113
+
+					v136 = v139
+
+					local v141 = v114
+
+					v137 = v140
+					v138 = v141
+				else
+					local v142 = v112
+					local v143 = v113
+					local v144 = v114
+
+					v135 = v134
+					v136 = v142
+					v137 = v143
+					v138 = v144
+				end
+
+				local Health
+
+				if v135 then
+					Health = v135
+					v112 = v136
+					v113 = v137
+					v114 = v138
+				else
+					v112 = v136
+					v113 = v137
+					v114 = v138
+					Health = t4.pickMode == "Lowest health" and v108.Health
+				end
+
+				Health = Health or Magnitude
+
+				local v146 = v118
+
+				if v146 then
+					local v147 = Health
+
+					v131 = Health < math.huge
+					v132 = v147
+				else
+					local v148 = Health
+
+					v131 = v146
+					v132 = v148
+				end
+			end
+
+			local v149, v150, v151, v152
+
+			if v131 then
+				v150 = v112
+				v151 = v113
+				v152 = v114
+				v149 = not t4.wallCheck or seen(v107, v103)
+			else
+				v149 = v131
+				v150 = v112
+				v151 = v113
+				v152 = v114
+			end
+
+			if v149 then
+				local v153 = v150
+				local v154 = v151
+				local v155 = v152
+				local v156, v157, v158, v159
+
+				if v90 == u17 then
+					local v160 = v153
+					local v161 = v154
+					local v162 = v155
+
+					v156 = v132
+					v157 = v160
+					v158 = v161
+					v159 = v162
+				else
+					local v163 = v153
+					local v164 = v154
+					local v165 = v155
+
+					v156 = v87
+					v157 = v163
+					v158 = v164
+					v159 = v165
+				end
+
+				local v166 = not v86
+				local v167, v168, v169, v170
+
+				if v166 then
+					local v171 = v157
+					local v172 = v158
+					local v173 = v159
+
+					v167 = v166
+					v168 = v171
+					v169 = v172
+					v170 = v173
+				else
+					local v174 = v157
+					local v175 = v158
+					local v176 = v159
+
+					v167 = v132 < v86
+					v168 = v174
+					v169 = v175
+					v170 = v176
+				end
+
+				if v167 then
+					local v177 = v156
+
+					v88 = v168
+					v79 = v169
+					v80 = v170
+					v84 = v103
+					v85 = v90
+					v86 = v132
+					v87 = v177
+				else
+					local v178 = v156
+
+					v88 = v168
+					v79 = v169
+					v80 = v170
+					v87 = v178
+				end
+			else
+				v88 = v150
+				v79 = v151
+				v80 = v152
+			end
+		end
+	end
+
+	if not (t4.pickMode == "Smart" and v87 and v85 ~= u17 and v86 > v87 - 0.08) then
+		return v85, v84
+	end
+
+	local v179, _, v181 = alive(u17)
+	local v182 = u17
+	local v183 = v179:FindFirstChild(t4.part)
+	local v184, v185
+
+	if v183 then
+		v184 = v182
+		v185 = v183
+	else
+		v184 = v182
+		v185 = v181
+	end
+
+	return v184, v185
+end
+smart = function(p13, p14, p15)
+	local v186 = t4.smartHp / 100 * 0.85
+	local v187 = 0.85 - v186
+	local v188 = p14.MaxHealth > 0 and p14.Health / p14.MaxHealth
+	local v189, v190
+
+	if v188 then
+		local v191, n1
+
+		if p15 == math.huge then
+			v191 = v187 * math.clamp(p13 / t4.maxDist, 0, 1) + v186 * v188
+			n1 = 0.15
+		else
+			local clamp = math.clamp
+			local fov = t4.useFov and t4.fov
+			local v195
+
+			if fov then
+				v195 = p15 / fov
+			else
+				v195 = p15 / 800
+			end
+
+			local v196 = clamp(v195, 0, 1)
+
+			v191 = v187 * math.clamp(p13 / t4.maxDist, 0, 1) + v186 * v188
+			n1 = 0.15 * v196
+		end
+
+		v189 = v191 + n1
+		v190 = v188 <= 0.25
+	else
+		local v197, n2
+
+		if p15 == math.huge then
+			v197 = v187 * math.clamp(p13 / t4.maxDist, 0, 1) + v186 * 1
+			n2 = 0.15
+		else
+			local clamp = math.clamp
+			local fov = t4.useFov and t4.fov
+			local v201
+
+			if fov then
+				v201 = p15 / fov
+			else
+				v201 = p15 / 800
+			end
+
+			local v202 = clamp(v201, 0, 1)
+
+			v197 = v187 * math.clamp(p13 / t4.maxDist, 0, 1) + v186 * 1
+			n2 = 0.15 * v202
+		end
+
+		v189 = v197 + n2
+		v190 = false
+	end
+
+	local v203
+
+	if v190 then
+		v203 = v189 - 0.2
+	else
+		v203 = v189
+	end
+
+	return v203
+end
+triggered = function()
+	if t4.aimTrigger == "Always" then
+		return true
+	end
+
+	if t4.aimTrigger == "Hold key" then
+		return keyDown(t4.aimKey)
+	end
+
+	return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+end
+dot = function(p16, p17)
+	return p16.X * p17.X + p16.Y * p17.Y + p16.Z * p17.Z
+end
+bend = function(p18)
+	local kind = typeof(p18)
+
+	if kind == "Vector3" then
+		if (p18 - Position).Magnitude <= 12 then
+			return u19
+		end
+
+		if math.abs(p18.Magnitude - 1) < 0.01 and dot(p18, Unit2) > 0.98 then
+			return Unit
+		end
+	elseif kind == "CFrame" then
+		local Position2 = p18.Position
+
+		if (Position2 - Position).Magnitude <= 12 then
+			return CFrame.new(u19)
+		end
+
+		if (Position2 - u22).Magnitude < 15 and dot(p18.LookVector, Unit2) > 0.98 then
+			return CFrame.lookAt(Position2, u19)
+		end
+	end
+
+	return p18
+end
+hook = function()
+	if u26 then
+		return true
+	end
+
+	if type(hookmetamethod) ~= "function" or type(getnamecallmethod) ~= "function" then
+		return false, "No hookmetamethod"
+	end
+
+	local newcclosure_ = type(newcclosure) == "function" and newcclosure or function(p19)
+		return p19
+	end
+	local v207
+	local v208
+
+	v207 = hookmetamethod(game, "__namecall", newcclosure_(function(P, ...)
+		if u25 and not checkcaller() then
+			local s = getnamecallmethod()
+
+			if (s == "FireServer" or s == "InvokeServer") and math.random(100) <= t4.chance then
+				local g = table.pack(...)
+
+				for d = 1, g.n, 1 do
+					g[d] = bend(g[d])
+				end
+
+				if setnamecallmethod then
+					setnamecallmethod(s)
+				end
+
+				return v207(P, table.unpack(g, 1, g.n))
+			end
+		end
+
+		return v207(P, ...)
+	end))
+	v208 = hookmetamethod(game, "__index", newcclosure_(function(P, s)
+		if u25 and (rawequal(P, mouse)) and not checkcaller() then
+			if s == "Hit" then
+				return CFrame.new(u19)
+			end
+
+			if s == "Target" then
+				return u18
+			end
+		end
+
+		if Move.on and (rawequal(P, Move.hum)) and not checkcaller() then
+			local g = Move.real[s]
+
+			if g ~= nil then
+				return g
+			end
+		end
+
+		return v208(P, s)
+	end))
+
+	local v213
+
+	v213 = hookmetamethod(game, "__newindex", newcclosure_(function(P, s, g)
+		if Move.watch and not checkcaller() then
+			if rawequal(P, Move.hum) then
+				local d = Move.forced[s]
+
+				if d ~= nil then
+					Move.real[s] = g
+
+					return v213(P, s, d)
+				end
+
+				if t4.noStun and (stunWrite(s, g)) then
+					return
+				end
+			elseif t4.noStun and (rawequal(P, Move.root)) and s == "Anchored" and g == true then
+				return
+			end
+		end
+
+		return v213(P, s, g)
+	end))
+	u26 = true
+
+	return true
+end
+jumpHeight = function(p20)
+	return p20 * p20 / (2 * workspace.Gravity)
+end
+
+local t7 = {
+	Enum.HumanoidStateType.Ragdoll,
+	Enum.HumanoidStateType.FallingDown,
+	Enum.HumanoidStateType.PlatformStanding
+}
+
+stunWrite = function(p21, p22)
+	if p21 == "WalkSpeed" or p21 == "JumpPower" or p21 == "JumpHeight" then
+		return type(p22) == "number" and p22 <= 1
+	end
+
+	if p21 == "PlatformStand" then
+		return p22 == true
+	end
+
+	if p21 == "AutoRotate" then
+		return p22 == false
+	end
+
+	return false
+end
+unstun = function(p23, p24, p25)
+	local v216 = t4.noStun and p24 ~= nil
+
+	if not v216 or Move.stunOff and p24 == Move.stunHum then
+		if not v216 and Move.stunOff then
+			local stunHum = Move.stunHum
+
+			if stunHum and stunHum.Parent then
+				local v218, v219, v220 = pairs(Move.stunSaved or {})
+				local v221 = geniter(v218, v219, v220)
+
+				while true do
+					local v222 = table.pack(v221())
+
+					if v222[1] then
+						stunHum:SetStateEnabled((v222[2])[1], (v222[2])[2])
+					else
+						break
+					end
+				end
+			end
+
+			local Move_ = Move
+			local s1 = "stunHum"
+
+			Move.stunOff = false
+			Move_[s1] = nil
+		end
+	else
+		Move.stunSaved = {}
+
+		local v225, v226, v227 = ipairs(t7)
+		local v228 = geniter(v225, v226, v227)
+
+		while true do
+			local v229 = table.pack(v228())
+
+			if not v229[1] then
+				break
+			end
+
+			local v230 = (v229[2])[2]
+
+			Move.stunSaved[v230] = p24:GetStateEnabled(v230)
+			p24:SetStateEnabled(v230, false)
+		end
+
+		local Move_ = Move
+		local s2 = "stunHum"
+
+		Move.stunOff = true
+		Move_[s2] = p24
+	end
+
+	if not v216 then
+		return
+	end
+
+	if p24.PlatformStand then
+		p24.PlatformStand = false
+	end
+
+	if not p24.AutoRotate then
+		p24.AutoRotate = true
+	end
+
+	if p25.Anchored then
+		p25.Anchored = false
+	end
+
+	local Stun = p23:FindFirstChild("Stun")
+
+	if Stun and Stun:IsA("ValueBase") and type(Stun.Value) == "number" and Stun.Value ~= 0 then
+		Stun.Value = 0
+	end
+
+	local Busy = p23:FindFirstChild("Busy")
+
+	if Busy and Busy:IsA("BoolValue") and Busy.Value then
+		Busy.Value = false
+	end
+end
+movement = function()
+	local v235, v236, v237 = alive(LocalPlayer)
+
+	Move.root = v237
+	pcall(unstun, v235, v236, v237)
+
+	local noStun = t4.noStun
+	local v239, Move_, on
+
+	if noStun then
+		v239 = v236
+		Move_ = Move
+		on = noStun
+	else
+		v239 = v236
+		Move_ = Move
+		on = Move.on
+	end
+
+	Move_.watch = on
+
+	if v239 ~= Move.hum then
+		Move.hum = v239
+
+		local Move_2 = Move
+
+		Move.real = {}
+		Move_2.forced = {}
+	end
+
+	Move.real = Move.real or {}
+
+	local Move_2, forced
+
+	if Move.forced then
+		Move_2 = Move
+		forced = Move.forced
+	else
+		Move_2 = Move
+		forced = {}
+	end
+
+	Move_2.forced = forced
+
+	if not v239 then
+		Move.on = false
+
+		return
+	end
+
+	local t8 = {}
+
+	if t4.speed then
+		t8.WalkSpeed = t4.speedValue
+	end
+
+	if t4.jumpOn then
+		t8.JumpPower = t4.jumpValue
+		t8.JumpHeight = jumpHeight(t4.jumpValue)
+	end
+
+	local v246, v247, v248 = pairs(Move.real)
+	local v249 = geniter(v246, v247, v248)
+
+	while true do
+		local v250 = table.pack(v249())
+
+		if v250[1] then
+			local v251 = (v250[2])[1]
+			local v252 = (v250[2])[2]
+
+			if t8[v251] == nil then
+				v239[v251] = v252
+				Move.real[v251] = nil
+			end
+		else
+			break
+		end
+	end
+
+	local v253, v254, v255 = pairs(t8)
+	local v256 = v239
+	local v257 = t8
+	local v258 = v256
+	local v259 = geniter(v253, v254, v255)
+
+	while true do
+		local v260 = table.pack(v259())
+
+		if v260[1] then
+			local v261 = (v260[2])[1]
+			local v262 = (v260[2])[2]
+
+			if Move.real[v261] == nil then
+				Move.real[v261] = v258[v261]
+			end
+
+			if v258[v261] ~= v262 then
+				v258[v261] = v262
+			end
+		else
+			break
+		end
+	end
+
+	Move.forced = v257
+	Move.on = next(v257) ~= nil
+
+	local noStun2 = t4.noStun
+	local Move_3, on2
+
+	if noStun2 then
+		Move_3 = Move
+		on2 = noStun2
+	else
+		Move_3 = Move
+		on2 = Move.on
+	end
+
+	Move_3.watch = on2
+end
+noclip = function()
+	local Character = LocalPlayer.Character
+
+	if not Character then
+		return
+	end
+
+	local noclip_ = t4.noclip or t4.fly and t4.flyNoclip and u17 ~= nil
+	local v268, v269, v270 = ipairs(Character:GetDescendants())
+	local v271 = noclip_
+	local v272 = geniter(v268, v269, v270)
+
+	while true do
+		local v273 = table.pack(v272())
+
+		if not v273[1] then
+			break
+		end
+
+		local v274 = (v273[2])[2]
+
+		if v274:IsA("BasePart") then
+			if v271 then
+				if Move.clip[v274] == nil then
+					Move.clip[v274] = v274.CanCollide
+				end
+
+				v274.CanCollide = false
+			elseif Move.clip[v274] ~= nil then
+				v274.CanCollide = Move.clip[v274]
+				Move.clip[v274] = nil
+			end
+		end
+	end
+
+	if not v271 then
+		table.clear(Move.clip)
+	end
+end
+escape = function()
+	local _, v276, v277 = alive(LocalPlayer)
+	local v278 = not t4.escape
+	local v279, v280
+
+	if v278 then
+		v279 = v277
+		v280 = v278
+	else
+		v279 = v277
+		v280 = not v276
+	end
+
+	if v280 then
+		return
+	end
+
+	local v281 = v276.MaxHealth > 0 and v276.Health / v276.MaxHealth * 100
+	local note, format
+
+	if not v281 then
+		if not (t4.escapeHp < 100) then
+			if Move.fled then
+				return
+			end
+
+			Move.fled = true
+			v279.CFrame += Vector3.new(0, t4.escapeUp, 0)
+			v279.AssemblyLinearVelocity = Vector3.zero
+
+			if UI.note then
+				note = UI.note
+				format = ("HP %*%%, escaped %* studs up").format
+
+				local s3 = "HP %*%%, escaped %* studs up"
+				local floor = math.floor
+				local n3 = 100
+				local v287 = format(s3, floor(n3), t4.escapeUp)
+
+				note(v287, "warn")
+			end
+
+			return
+		end
+	elseif not (v281 > t4.escapeHp) then
+		if Move.fled then
+			return
+		end
+
+		Move.fled = true
+		v279.CFrame += Vector3.new(0, t4.escapeUp, 0)
+		v279.AssemblyLinearVelocity = Vector3.zero
+
+		if not UI.note then
+			return
+		end
+
+		local v288 = v281
+
+		note = UI.note
+		format = ("HP %*%%, escaped %* studs up").format
+		note(format("HP %*%%, escaped %* studs up", math.floor(v288), t4.escapeUp), "warn")
+
+		return
+	end
+
+	Move.fled = false
+end
+findGun = function(p26)
+	local v289 = t4.gunPick == "Any gun"
+
+	local function v290(p27)
+		if not p27:IsA("Tool") then
+			return false
+		end
+
+		if v289 then
+			return p27.ToolTip == "Gun"
+		end
+
+		return string.find(string.lower(string.gsub(p27.Name, "%s", "")), "dragonstorm", 1, true) ~= nil
+	end
+
+	local v291, v292, v293 = ipairs(p26:GetChildren())
+	local v294 = geniter(v291, v292, v293)
+
+	while true do
+		local v295 = table.pack(v294())
+
+		if v295[1] then
+			local v296 = (v295[2])[2]
+
+			if v290(v296) then
+				return v296, true
+			end
+
+			continue
+		end
+
+		break
+	end
+
+	local v297, v298, v299 = ipairs(LocalPlayer.Backpack:GetChildren())
+	local v300 = geniter(v297, v298, v299)
+
+	while true do
+		local v301 = table.pack(v300())
+
+		if v301[1] then
+			local v302 = (v301[2])[2]
+
+			if v290(v302) then
+				return v302, false
+			end
+
+			continue
+		end
+
+		break
+	end
+end
+press = function(p28)
+	local ok, result = pcall(game.GetService, game, "VirtualInputManager")
+
+	if not ok or not result then
+		return
+	end
+
+	local function v305()
+		result:SendKeyEvent(true, Enum.KeyCode[p28], false, game)
+		task.wait(0.06)
+		result:SendKeyEvent(false, Enum.KeyCode[p28], false, game)
+	end
+
+	pcall(v305)
+end
+shoot = function()
+	local v306, v307, v308 = alive(LocalPlayer)
+
+	if not v306 then
+		return false, "No character"
+	end
+
+	local _, _, v311 = alive(u17)
+
+	if not v311 then
+		return false, "No target"
+	end
+
+	if (v311.Position - v308.Position).Magnitude > t4.gunRange then
+		return false, "Target out of range"
+	end
+
+	local v312, v313 = findGun(v306)
+
+	if not v312 then
+		return false, t4.gunPick == "Any gun" and "No gun in backpack" or "No Dragonstorm in backpack"
+	end
+
+	local v314, v315 = hook()
+
+	if not v314 then
+		return false, v315
+	end
+
+	local Tool = v306:FindFirstChildOfClass("Tool")
+	local v317
+
+	if v313 then
+		v317 = v312
+	else
+		v317 = v312
+		v307:EquipTool(v317)
+		task.wait(0.12)
+	end
+
+	Gun.aimUntil = os.clock() + (t4.gunSkills and 0.9 or 0.4)
+	v317:Activate()
+
+	if t4.gunSkills then
+		press("Z")
+		press("X")
+	end
+
+	Gun.shots += 1
+
+	if t4.gunBack and Tool and Tool ~= v317 then
+		local function v318()
+			if Tool.Parent == LocalPlayer.Backpack and alive(LocalPlayer) then
+				v307:EquipTool(Tool)
+			end
+		end
+
+		task.delay(0.3, v318)
+	end
+
+	return true, (("Shots %*"):format(Gun.shots))
+end
+net = function()
+	local Modules = ReplicatedStorage:FindFirstChild("Modules")
+
+	Modules = Modules and Modules:FindFirstChild("Net")
+
+	local v320
+
+	if Modules then
+		local v321 = Modules
+
+		Modules = Modules:FindFirstChild("RE/RegisterAttack")
+		v320 = v321
+	else
+		v320 = Modules
+	end
+
+	return Modules, v320 and v320:FindFirstChild("RE/RegisterHit")
+end
+remote = function(p29)
+	local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+
+	return Remotes and Remotes:FindFirstChild(p29)
+end
+
+local t9 = {
+	Melee = true,
+	Sword = true
+}
+
+arm = function(p30, p31)
+	local Tool = p30:FindFirstChildOfClass("Tool")
+
+	if t4.auraWeapon == "Keep current" then
+		if Tool and t9[Tool.ToolTip] then
+			return Tool
+		end
+
+		return nil, "Hold a melee or sword"
+	end
+
+	if Tool and Tool.ToolTip == t4.auraWeapon then
+		return Tool
+	end
+
+	local v325, v326, v327 = ipairs(LocalPlayer.Backpack:GetChildren())
+	local v328 = geniter(v325, v326, v327)
+	local v329
+	local v330
+
+	while true do
+		local v331 = table.pack(v328())
+
+		if v331[1] then
+			local v332 = (v331[2])[2]
+			local isTool = v332:IsA("Tool")
+			local v334, v335, v336, v337, n4, n5
+
+			if isTool then
+				local v340 = v328
+				local v341 = v329
+				local v342 = v330
+
+				v334 = v332.ToolTip == t4.auraWeapon
+				v335 = v340
+				v336 = v341
+				v337 = v342
+				n4 = 2
+				n5 = 3
+			else
+				local v343 = v328
+				local v344 = v329
+				local v345 = v330
+
+				v334 = isTool
+				v335 = v343
+				v336 = v344
+				v337 = v345
+				n4 = 2
+				n5 = 3
+			end
+
+			if v334 then
+				p31:EquipTool(v332)
+
+				return v332
+			end
+
+			v328 = v335
+			v329 = v336
+			v330 = v337
+
+			continue
+		end
+
+		break
+	end
+
+	return nil, (("No %* in backpack"):format(t4.auraWeapon))
+end
+swing = function()
+	local v346, v347, v348 = alive(LocalPlayer)
+
+	if not v346 then
+		return false, "No character"
+	end
+
+	local v349, v350 = net()
+
+	if not v349 or not v350 then
+		return false, "No combat api"
+	end
+
+	local t10 = {}
+	local v352, v353, v354 = ipairs(Players:GetPlayers())
+	local v355 = geniter(v352, v353, v354)
+	local v356
+	local v357
+
+	while true do
+		local v358 = table.pack(v355())
+
+		if not v358[1] then
+			break
+		end
+
+		local v359 = (v358[2])[2]
+		local v360, _, v362 = foe(v359)
+		local v363, v364, v365, v366, v367, v368
+
+		if v360 then
+			local v369 = v355
+			local v370 = v356
+			local v371 = v357
+
+			v363 = v360
+			v364 = v362
+
+			local v372 = v369
+			local v373 = v370
+			local v374 = v371
+			local auraAll = t4.auraAll
+
+			if auraAll then
+				local v376 = v372
+				local v377 = v373
+				local v378 = v374
+
+				v365 = auraAll
+				v366 = v376
+				v367 = v377
+				v368 = v378
+			else
+				local v379 = v372
+				local v380 = v373
+				local v381 = v374
+
+				v365 = v359 == u17
+				v366 = v379
+				v367 = v380
+				v368 = v381
+			end
+		else
+			local v382 = v355
+			local v383 = v356
+			local v384 = v357
+
+			v363 = v360
+			v364 = v362
+			v365 = v360
+			v366 = v382
+			v367 = v383
+			v368 = v384
+		end
+
+		if v365 then
+			local v385 = v348
+			local v386 = v366
+			local v387 = v367
+			local v388 = v368
+			local v389 = v386
+			local v390 = v387
+			local v391 = v388
+
+			v348 = v385
+			v365 = (v364.Position - v385.Position).Magnitude <= t4.auraRange
+			v366 = v389
+			v367 = v390
+			v368 = v391
+		end
+
+		if v365 then
+			local v392 = v363
+			local v393 = v364
+			local v394 = v392
+			local v395 = v366
+			local v396 = v367
+			local v397 = v368
+			local v398 = #t10 + 1
+			local t11 = {}
+			local Head = v394:FindFirstChild("Head")
+			local v401, v402, v403, v404, v405, v406, v407
+
+			if Head then
+				local v408 = v395
+				local v409 = v396
+				local v410 = v397
+
+				v401 = v394
+				v402 = v398
+				v403 = t11
+				v404 = Head
+				v405 = v408
+				v406 = v409
+				v407 = v410
+			else
+				local v411 = v393
+				local v412 = v395
+				local v413 = v396
+				local v414 = v397
+
+				v401 = v394
+				v402 = v398
+				v403 = t11
+				v404 = v411
+				v405 = v412
+				v406 = v413
+				v407 = v414
+			end
+
+			v403[1] = v401
+			v403[2] = v404
+			t10[v402] = v403
+			v355 = v405
+			v356 = v406
+			v357 = v407
+		else
+			v355 = v366
+			v356 = v367
+			v357 = v368
+		end
+	end
+
+	local v415 = v349
+	local v416 = v350
+
+	if #t10 == 0 then
+		return false, "No one in range"
+	end
+
+	local _, v418 = arm(v346, v347)
+
+	if v418 then
+		return false, v418
+	end
+
+	local v419 = v416
+
+	v415:FireServer(0)
+	v419:FireServer(t10[1][2], t10)
+	Aura.swings += 1
+
+	return true, (("Hit %*"):format(#t10))
+end
+buso = function()
+	local v420 = alive(LocalPlayer)
+
+	if not v420 or v420:FindFirstChild("HasBuso") then
+		return
+	end
+
+	local CommF_ = remote("CommF_")
+
+	if not CommF_ then
+		return false, "No CommF_"
+	end
+
+	CommF_:InvokeServer("Buso")
+end
+ken = function()
+	if not alive(LocalPlayer) then
+		return
+	end
+
+	local CommE = remote("CommE")
+
+	if not CommE then
+		return false, "No CommE"
+	end
+
+	CommE:FireServer("Ken", true)
+end
+race = function()
+	if not alive(LocalPlayer) then
+		return false, "No character"
+	end
+
+	local CommE = remote("CommE")
+
+	if not CommE then
+		return false, "No CommE"
+	end
+
+	CommE:FireServer("ActivateAbility")
+
+	return true
+end
+
+local t12 = {
+	BodyVelocity = true,
+	BodyPosition = true,
+	BodyGyro = true,
+	BodyForce = true,
+	BodyAngularVelocity = true,
+	BodyThrust = true,
+	RocketPropulsion = true,
+	LinearVelocity = true,
+	AlignPosition = true,
+	AlignOrientation = true,
+	VectorForce = true,
+	AngularVelocity = true
+}
+
+stunMover = function(p32, p33)
+	if not t12[p32.ClassName] or p32:GetAttribute("NightPvp") then
+		return false
+	end
+
+	if t4.moverFilter == "Remove all" or not p33 then
+		return true
+	end
+
+	local LookVector = p33.CFrame.LookVector
+	local Velocity = p32:IsA("BodyVelocity") and p32.Velocity or p32:IsA("LinearVelocity") and p32.VectorVelocity or nil
+
+	if Velocity then
+		if Velocity.Magnitude < 1 then
+			return true
+		end
+
+		return Velocity.Unit:Dot(LookVector) < 0.3
+	end
+
+	local Position2 = p32:IsA("BodyPosition") and p32.Position or p32:IsA("AlignPosition") and p32.Position or nil
+
+	if not Position2 then
+		return true
+	end
+
+	local v428 = Position2 - p33.Position
+
+	return v428.Magnitude < 4 or v428.Unit:Dot(LookVector) < 0.3
+end
+watchMovers = function(p34)
+	if Move.moverBond then
+		Move.moverBond:Disconnect()
+	end
+
+	if not p34 then
+		return
+	end
+
+	local s4 = "moverBond"
+
+	local function v430(descendant)
+		if not t4.noStun or not t12[descendant.ClassName] then
+			return
+		end
+
+		local function v431()
+			if descendant.Parent and stunMover(descendant, p34:FindFirstChild("HumanoidRootPart")) then
+				descendant:Destroy()
+			end
+		end
+
+		task.defer(v431)
+	end
+
+	Move[s4] = bind(p34.DescendantAdded:Connect(v430))
+end
+sweepMovers = function()
+	if not t4.noStun then
+		return
+	end
+
+	local Character = LocalPlayer.Character
+	local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+
+	if not HumanoidRootPart then
+		return
+	end
+
+	local v434, v435, v436 = ipairs(Character:GetDescendants())
+	local v437 = HumanoidRootPart
+	local v438 = geniter(v434, v435, v436)
+	local v439
+	local v440
+
+	while true do
+		local v441 = table.pack(v438())
+
+		if v441[1] then
+			local v442 = (v441[2])[2]
+			local v443 = t12[v442.ClassName]
+			local v444, v445, v446, v447
+
+			if v443 then
+				local v448 = v438
+				local v449 = v439
+				local v450 = v440
+
+				v444 = stunMover(v442, v437)
+				v445 = v448
+				v446 = v449
+				v447 = v450
+			else
+				local v451 = v438
+				local v452 = v439
+				local v453 = v440
+
+				v444 = v443
+				v445 = v451
+				v446 = v452
+				v447 = v453
+			end
+
+			if v444 then
+				v438 = v445
+				v439 = v446
+				v440 = v447
+				v442:Destroy()
+			else
+				v438 = v445
+				v439 = v446
+				v440 = v447
+			end
+		else
+			break
+		end
+	end
+end
+flyGoal = function(p35, p36)
+	local vector3 = Vector3.new(0, t4.flyUp, 0)
+
+	if t4.flyMode ~= "Smart" then
+		if t4.flyMode ~= "Kite" then
+			if t4.flyMode ~= "Orbit" then
+				local AssemblyLinearVelocity = p35.AssemblyLinearVelocity
+				local vector32 = Vector3.new(AssemblyLinearVelocity.X, 0, AssemblyLinearVelocity.Z)
+
+				if vector32.Magnitude > 2 then
+					return p35.Position + vector32.Unit * t4.flyDist + vector3
+				end
+
+				return p35.Position - p35.CFrame.LookVector * t4.flyDist + vector3
+			end
+
+			local Fly_ = Fly
+
+			Fly_.angle += t4.orbitSpeed * p36
+
+			return p35.Position + Vector3.new(math.cos(Fly.angle), 0, math.sin(Fly.angle)) * t4.orbitRadius + vector3
+		end
+
+		local Fly_ = Fly
+
+		Fly_.angle += p36
+
+		local v459 = -p35.CFrame.LookVector
+		local vector32 = Vector3.new(v459.X, 0, v459.Z)
+		local Unit3 = vector32.Magnitude > 0.1 and vector32.Unit or Vector3.new(0, 0, 1)
+
+		return p35.Position + Unit3 * t4.kiteDist + Vector3.new(-Unit3.Z, 0, Unit3.X) * math.sin(Fly.angle * 2) * t4.kiteSway + vector3
+	end
+
+	local _, v463 = alive(LocalPlayer)
+	local _, v465 = alive(u17)
+	local v466 = v463
+	local v467, v468
+
+	if v466 then
+		v467 = v465
+		v463 = v466
+		v468 = v463.MaxHealth > 0
+	else
+		v467 = v465
+		v468 = v463
+	end
+
+	local v469 = v468 and v463.Health / v463.MaxHealth
+	local Fly_, v471, v472, v473, v474, v475
+
+	if v469 then
+		local v476 = v467 and v467.MaxHealth > 0
+		local v477, v478
+
+		if v476 then
+			local v479 = v467.Health / v467.MaxHealth
+
+			v477 = v469
+			v478 = v479
+		else
+			v477 = v469
+			v478 = v476
+		end
+
+		if v478 then
+			Fly_ = Fly
+			v471 = v477 * 100 >= t4.retreatHp
+
+			if v471 then
+				local crowd_ = Fly.crowd
+
+				if crowd_ then
+					v471 = crowd_ <= 1
+				else
+					v471 = true
+				end
+			end
+
+			if v471 then
+				v472 = (v477 - v478) * 100 >= -t4.engageEdge
+				v473 = Fly_
+				v474 = v472
+			else
+				v473 = Fly_
+				v474 = v471
+			end
+		else
+			Fly_ = Fly
+			v471 = v477 * 100 >= t4.retreatHp
+
+			if v471 then
+				local crowd_ = Fly.crowd
+
+				if crowd_ then
+					v471 = crowd_ <= 1
+				else
+					v471 = true
+				end
+			end
+
+			if v471 then
+				v475 = v477 - 1
+				v472 = v475 * 100 >= -t4.engageEdge
+				v473 = Fly_
+				v474 = v472
+			else
+				v473 = Fly_
+				v474 = v471
+			end
+		end
+	else
+		local v482 = v467 and v467.MaxHealth > 0
+		local v483
+
+		if v482 then
+			v483 = v467.Health / v467.MaxHealth
+		else
+			v483 = v482
+		end
+
+		if v483 then
+			Fly_ = Fly
+			v471 = t4.retreatHp <= 100
+
+			if v471 then
+				local crowd_ = Fly.crowd
+
+				if crowd_ then
+					v471 = crowd_ <= 1
+				else
+					v471 = true
+				end
+			end
+
+			if v471 then
+				v475 = 1 - v483
+				v472 = v475 * 100 >= -t4.engageEdge
+				v473 = Fly_
+				v474 = v472
+			else
+				v473 = Fly_
+				v474 = v471
+			end
+		else
+			Fly_ = Fly
+			v471 = t4.retreatHp <= 100
+
+			if v471 then
+				local crowd_ = Fly.crowd
+
+				if crowd_ then
+					v471 = crowd_ <= 1
+				else
+					v471 = true
+				end
+			end
+
+			if v471 then
+				v472 = -t4.engageEdge <= 0
+				v473 = Fly_
+				v474 = v472
+			else
+				v473 = Fly_
+				v474 = v471
+			end
+		end
+	end
+
+	v473.push = v474
+	Fly.angle += p36
+
+	local v486 = -p35.CFrame.LookVector
+	local vector32 = Vector3.new(v486.X, 0, v486.Z)
+	local Unit3 = vector32.Magnitude > 0.1 and vector32.Unit or Vector3.new(0, 0, 1)
+	local vector33 = Vector3.new(-Unit3.Z, 0, Unit3.X)
+
+	if Fly.push then
+		return p35.Position + Unit3 * t4.engageDist + Vector3.new(0, 2, 0)
+	end
+
+	return p35.Position + Unit3 * t4.kiteDist + vector33 * math.sin(Fly.angle * 2) * t4.kiteSway + vector3
+end
+fly = function(p37)
+	if not t4.fly then
+		local Fly_ = Fly
+		local s5 = "note"
+
+		Fly.expect = nil
+		Fly_[s5] = "Off"
+
+		return
+	end
+
+	local _, _, v494 = alive(LocalPlayer)
+	local _, _, v497 = alive(u17)
+	local v498 = not v494
+	local v499, v500, v501
+
+	if v498 then
+		v499 = v494
+		v500 = v497
+		v501 = v498
+	else
+		v499 = v494
+		v500 = v497
+		v501 = not v500
+	end
+
+	if v501 then
+		Fly.expect = nil
+
+		local Fly_ = Fly
+		local v503, note
+
+		if v499 then
+			v503 = Fly_
+			note = "No target"
+		else
+			local v505 = v499
+
+			v503 = Fly_
+			note = v505
+		end
+
+		v503.note = note or "No character"
+
+		return
+	end
+
+	if Fly.expect and (v499.Position - Fly.expect).Magnitude > math.max(8, Fly.step * 3) then
+		Fly.slowUntil = os.clock() + 6
+
+		local Fly_ = Fly
+
+		Fly_.rubber += 1
+	end
+
+	local flySafe = os.clock() < Fly.slowUntil and t4.flySafe or t4.flySpeed
+	local v508 = flyGoal(v500, p37) - v499.Position
+	local v509 = math.min(v508.Magnitude, flySafe * p37)
+	local Position2 = v508.Magnitude > 0.05 and v499.Position + v508.Unit * v509 or v499.Position
+
+	v499.CFrame = CFrame.lookAt(Position2, Vector3.new(v500.Position.X, Position2.Y, v500.Position.Z))
+	v499.AssemblyLinearVelocity = Vector3.zero
+	v499.AssemblyAngularVelocity = Vector3.zero
+
+	local s6 = "step"
+
+	Fly.expect = Position2
+	Fly[s6] = v509
+
+	local v512 = t4.flyMode == "Smart"
+	local v513, v514
+
+	if v512 then
+		v513 = v508
+		v514 = Fly.push and "ATTACK  |  " or "KITE  |  "
+	else
+		v513 = v508
+		v514 = v512
+	end
+
+	v514 = v514 or ""
+	Fly.note = ("%*%* studs/s  |  %* away  |  pulled back %*x"):format(v514, flySafe, math.floor(v513.Magnitude), Fly.rubber)
+end
+antiAimBeat = function()
+	if not t4.antiAim then
+		return
+	end
+
+	local _, _, v517 = alive(LocalPlayer)
+
+	if not v517 then
+		return
+	end
+
+	local v518 = v517
+
+	Fly.realVel = v518.AssemblyLinearVelocity
+
+	local antiAimPower = t4.antiAimPower
+
+	v518.AssemblyLinearVelocity = Vector3.new(math.random(-antiAimPower, antiAimPower), math.random(-antiAimPower, antiAimPower) * 0.3, math.random(-antiAimPower, antiAimPower))
+end
+antiAimStep = function()
+	if not Fly.realVel then
+		return
+	end
+
+	local _, _, v522 = alive(LocalPlayer)
+
+	if v522 then
+		v522.AssemblyLinearVelocity = Fly.realVel
+	end
+
+	Fly.realVel = nil
+end
+dodge = function()
+	local v523 = not t4.dodge
+
+	if not v523 then
+		local now = os.clock()
+		local dodgeAt = Move.dodgeAt
+
+		if dodgeAt then
+			v523 = now < dodgeAt
+		else
+			v523 = now < 0
+		end
+	end
+
+	if v523 then
+		return
+	end
+
+	local _, _, v528 = alive(LocalPlayer)
+
+	if not v528 then
+		return
+	end
+
+	local v529 = v528
+	local v530, v531, v532 = ipairs(Players:GetPlayers())
+	local v533 = geniter(v530, v531, v532)
+	local v534
+	local v535
+
+	while true do
+		local v536 = table.pack(v533())
+
+		if not v536[1] then
+			break
+		end
+
+		local v537, _, v539 = foe((v536[2])[2])
+
+		if not v537 then
+			continue
+		end
+
+		local v540 = v529
+		local v541 = v533
+		local v542 = v534
+		local v543 = v535
+		local v544 = v539
+		local v545 = v540
+		local v546 = v541
+		local v547 = v542
+		local v548 = v543
+		local v549 = v545.Position - v544.Position
+		local Magnitude = v549.Magnitude
+		local v551 = Magnitude > 0.1
+		local v552, v553, v554, v555, v556, v557
+
+		if v551 then
+			local v558 = v544
+			local v559 = v546
+			local v560 = v547
+			local v561 = v548
+
+			v529 = v545
+			v552 = v558
+			v553 = v549
+
+			local v562 = Magnitude
+
+			v554 = v559
+			v555 = v560
+			v556 = v561
+			v557 = v562 < t4.dodgeRange
+		else
+			local v563 = v544
+			local v564 = v546
+			local v565 = v547
+			local v566 = v548
+
+			v529 = v545
+			v552 = v563
+			v553 = v549
+			v557 = v551
+			v554 = v564
+			v555 = v565
+			v556 = v566
+		end
+
+		local v567, v568, v569, v570, v571
+
+		if v557 then
+			local v572 = v552
+
+			v567 = v553
+			v569 = v554
+			v570 = v555
+			v571 = v556
+			v568 = v572.CFrame.LookVector:Dot(v567.Unit) > 0.85
+		else
+			v567 = v553
+			v568 = v557
+			v569 = v554
+			v570 = v555
+			v571 = v556
+		end
+
+		if v568 then
+			local vector3 = Vector3.new(v567.X, 0, v567.Z)
+			local Unit3 = vector3.Magnitude > 0.1 and Vector3.new(-vector3.Z, 0, vector3.X).Unit or Vector3.new(1, 0, 0)
+
+			if math.random() < 0.5 then
+				Unit3 = -Unit3
+			end
+
+			v529.CFrame += Unit3 * t4.dodgeDist
+			Fly.expect = nil
+			Move.dodgeAt = os.clock() + t4.dodgeCd
+
+			return
+		end
+
+		v533 = v569
+		v534 = v570
+		v535 = v571
+	end
+end
+crowd = function()
+	-- (could not be recovered)
+end
+hold = function(p38, p39)
+	local ok, result = pcall(game.GetService, game, "VirtualInputManager")
+
+	if not ok or not result then
+		return
+	end
+
+	local function v577()
+		result:SendKeyEvent(true, Enum.KeyCode[p38], false, game)
+		task.wait(math.max(p39, 0.03))
+		result:SendKeyEvent(false, Enum.KeyCode[p38], false, game)
+	end
+
+	pcall(v577)
+end
+skills = function()
+	local v578, _, v580 = alive(LocalPlayer)
+
+	if not v578 then
+		return false, "No character"
+	end
+
+	local v581 = v580
+	local _, _, v584 = alive(u17)
+
+	if not v584 then
+		return false, "No target"
+	end
+
+	if (v584.Position - v581.Position).Magnitude > t4.skillRange then
+		return false, "Target out of range"
+	end
+
+	local v585, v586 = hook()
+
+	if not v585 then
+		return false, v586
+	end
+
+	local v587, v588, v589 = ipairs({
+		"Z",
+		"X",
+		"C",
+		"V",
+		"F"
+	})
+	local v590 = geniter(v587, v588, v589)
+	local v591
+	local v592
+
+	while true do
+		local v593 = table.pack(v590())
+
+		if v593[1] then
+			local v594 = (v593[2])[2]
+			local v595 = not t4.autoSkill
+			local v596, v597, v598, v599, n6, n7
+
+			if v595 then
+				local v602 = v590
+				local v603 = v591
+				local v604 = v592
+
+				v596 = v595
+				v597 = v602
+				v598 = v603
+				v599 = v604
+				n6 = 2
+				n7 = 1
+			else
+				local v605 = v590
+				local v606 = v591
+				local v607 = v592
+
+				v596 = not alive(u17)
+				v597 = v605
+				v598 = v606
+				v599 = v607
+				n6 = 2
+				n7 = 1
+			end
+
+			if v596 then
+				break
+			end
+
+			v590 = v597
+			v591 = v598
+			v592 = v599
+
+			if t4.skillKeys[v594] then
+				Gun.aimUntil = os.clock() + t4.skillHold + 0.5
+				hold(v594, t4.skillHold)
+				task.wait(t4.skillGap)
+			end
+
+			continue
+		end
+
+		break
+	end
+end
+hitboxes = function()
+	local v608, v609, v610 = ipairs(Players:GetPlayers())
+	local v611 = geniter(v608, v609, v610)
+	local v612
+	local v613
+
+	while true do
+		local v614 = table.pack(v611())
+
+		if not v614[1] then
+			break
+		end
+
+		local v615 = (v614[2])[2]
+		local v616 = v615 ~= LocalPlayer
+		local Character, v618, v619, v620, n8, n9
+
+		if v616 then
+			local v623 = v611
+			local v624 = v612
+			local v625 = v613
+
+			Character = v615.Character
+			v618 = v623
+			v619 = v624
+			v620 = v625
+			n8 = 2
+			n9 = 1
+		else
+			local v626 = v611
+			local v627 = v612
+			local v628 = v613
+
+			Character = v616
+			v618 = v626
+			v619 = v627
+			v620 = v628
+			n8 = 2
+			n9 = 1
+		end
+
+		if Character then
+			local v629 = v618
+			local v630 = v619
+			local v631 = v620
+			local v632 = v629
+			local v633 = v630
+			local v634 = v631
+
+			Character = v615.Character:FindFirstChild("HumanoidRootPart")
+			v618 = v632
+			v619 = v633
+			v620 = v634
+			n8 = 2
+		end
+
+		if Character then
+			local v635 = Hit.orig[Character]
+			local hitbox = t4.hitbox
+			local v637, v638, v639, v640, v641
+
+			if hitbox then
+				local v642 = v618
+				local v643 = v619
+
+				v637 = v635
+
+				local v644 = v642
+				local v645 = v620
+
+				v638 = foe(v615)
+				v639 = v644
+				v640 = v643
+				v641 = v645
+			else
+				local v646 = v618
+				local v647 = v619
+				local v648 = v620
+
+				v637 = v635
+				v638 = hitbox
+				v639 = v646
+				v640 = v647
+				v641 = v648
+			end
+
+			if v638 then
+				local v649 = v639
+				local v650 = v640
+				local v651 = v641
+				local v652, v653, v654
+
+				if v637 then
+					v652 = v649
+					v653 = v650
+					v654 = v651
+				else
+					v652 = v649
+					v653 = v650
+					v654 = v651
+					Hit.orig[Character] = {
+						Character.Size,
+						Character.Transparency,
+						Character.CanCollide
+					}
+				end
+
+				local v655 = Vector3.one * t4.hitboxSize
+
+				if Character.Size ~= v655 then
+					local v656 = v652
+					local v657 = v655
+
+					Character.Size = v657
+					v652 = v656
+				end
+
+				local hitboxShow = t4.hitboxShow
+				local transparency, v660, v661, v662, n10, n11
+
+				if hitboxShow then
+					local v665 = v652
+
+					transparency = 0.8
+
+					local v666 = v653
+
+					v660 = v665
+
+					local v667 = v654
+
+					v661 = v666
+					v662 = v667
+					n10 = 2
+					n11 = 1
+				else
+					local v668 = v652
+					local v669 = v653
+					local v670 = v654
+
+					transparency = hitboxShow
+					v660 = v668
+					v661 = v669
+					v662 = v670
+					n10 = 2
+					n11 = 1
+				end
+
+				if transparency then
+					Character.Transparency = transparency
+				else
+					local v671 = v660
+					local v672 = v661
+					local v673 = v662
+					local v674 = v671
+					local v675 = v672
+
+					v660 = v674
+
+					local v676 = v673
+
+					v661 = v675
+					v662 = v676
+					n10 = 2
+					n11 = 1
+					Character.Transparency = 1
+				end
+
+				Character.CanCollide = false
+				v611 = v660
+				v612 = v661
+				v613 = v662
+			else
+				local v677 = v639
+				local v678 = v640
+				local v679 = v641
+
+				if v637 then
+					local v680 = v637[2]
+					local v681 = v637[3]
+
+					Character.Size = v637[1]
+					Character.Transparency = v680
+					Character.CanCollide = v681
+					Hit.orig[Character] = nil
+					v611 = v677
+					v612 = v678
+					v613 = v679
+				else
+					v611 = v677
+					v612 = v678
+					v613 = v679
+				end
+			end
+		else
+			v611 = v618
+			v612 = v619
+			v613 = v620
+		end
+	end
+
+	local v682, v683, v684 = pairs(Hit.orig)
+	local v685 = geniter(v682, v683, v684)
+
+	while true do
+		local v686 = table.pack(v685())
+
+		if v686[1] then
+			local v687 = (v686[2])[1]
+
+			if not v687.Parent then
+				Hit.orig[v687] = nil
+			end
+		else
+			break
+		end
+	end
+end
+stick = function()
+	if not t4.stick or not u17 or t4.fly then
+		return
+	end
+
+	local _, _, v690 = alive(LocalPlayer)
+	local _, _, v693 = alive(u17)
+	local v694 = not v690
+	local v695, v696, v697
+
+	if v694 then
+		v695 = v690
+		v696 = v693
+		v697 = v694
+	else
+		v695 = v690
+		v696 = v693
+		v697 = not v696
+	end
+
+	if v697 or (v696.Position - v695.Position).Magnitude > t4.stickRange then
+		return
+	end
+
+	local v698 = v696.Position - v696.CFrame.LookVector * t4.stickBack + Vector3.new(0, t4.stickUp, 0)
+
+	v695.CFrame = CFrame.lookAt(v698, Vector3.new(v696.Position.X, v698.Y, v696.Position.Z))
+	v695.AssemblyLinearVelocity = Vector3.zero
+end
+antiAfk = function()
+	if type(getconnections) ~= "function" then
+		return false, "No getconnections"
+	end
+
+	local v699, v700, v701 = ipairs(getconnections(LocalPlayer.Idled))
+	local v702 = geniter(v699, v700, v701)
+
+	while true do
+		local v703 = table.pack(v702())
+
+		if v703[1] then
+			local v704 = (v703[2])[2]
+
+			local function v705()
+				if t4.antiAfk then
+					v704:Disable()
+				else
+					v704:Enable()
+				end
+			end
+
+			pcall(v705)
+		else
+			break
+		end
+	end
+
+	return true
+end
+
+local v706 = type(Drawing) == "table" and type(Drawing.new) == "function"
+
+draw = function(p40, p41)
+	local v707 = Drawing.new(p40)
+	local v708, v709, v710 = pairs(p41)
+	local v711 = geniter(v708, v709, v710)
+
+	while true do
+		local v712 = table.pack(v711())
+
+		if v712[1] then
+			v707[(v712[2])[1]] = (v712[2])[2]
+		else
+			break
+		end
+	end
+
+	return v707
+end
+kit = function(p42)
+	local v713 = Esp.pool[p42]
+
+	if v713 then
+		return v713
+	end
+
+	local t13 = {
+		edge = draw("Square", {
+			Thickness = 3,
+			Filled = false,
+			Color = Color3.new(),
+			Visible = false
+		}),
+		box = draw("Square", {
+			Thickness = 1,
+			Filled = false,
+			Visible = false
+		}),
+		name = draw("Text", {
+			Size = 14,
+			Center = true,
+			Outline = true,
+			Visible = false
+		}),
+		info = draw("Text", {
+			Size = 13,
+			Center = true,
+			Outline = true,
+			Color = Color3.fromRGB(210, 210, 210),
+			Visible = false
+		}),
+		back = draw("Square", {
+			Filled = true,
+			Color = Color3.new(),
+			Visible = false
+		}),
+		fill = draw("Square", {
+			Filled = true,
+			Visible = false
+		}),
+		hp = draw("Text", {
+			Size = 12,
+			Outline = true,
+			Visible = false
+		}),
+		line = draw("Line", {
+			Thickness = 1,
+			Visible = false
+		})
+	}
+
+	Esp.pool[p42] = t13
+
+	return t13
+end
+blank = function(p43)
+	local v715, v716, v717 = pairs(p43)
+	local v718 = geniter(v715, v716, v717)
+
+	while true do
+		local v719 = table.pack(v718())
+
+		if v719[1] then
+			local v720 = (v719[2])[2]
+
+			if (v719[2])[1] ~= "cham" then
+				v720.Visible = false
+			end
+		else
+			break
+		end
+	end
+end
+hide = function(p44)
+	blank(p44)
+
+	if p44.cham then
+		p44.cham.Enabled = false
+	end
+end
+drop = function(p45)
+	local v721 = Esp.pool[p45]
+
+	if not v721 then
+		return
+	end
+
+	local v722, v723, v724 = pairs(v721)
+	local v725 = geniter(v722, v723, v724)
+
+	while true do
+		local v726 = table.pack(v725())
+
+		if v726[1] then
+			local v727 = (v726[2])[2]
+
+			local function v728()
+				v727:Destroy()
+			end
+
+			pcall(v728)
+		else
+			break
+		end
+	end
+
+	Esp.pool[p45] = nil
+end
+tintOf = function(p46)
+	if p46 == u17 and t4.tgtMark then
+		return t5[t4.tgtColor]
+	end
+
+	if t4.teamColor and p46.Team then
+		return p46.TeamColor.Color
+	end
+
+	return t5[t4.espColor]
+end
+lore = function(p47, p48)
+	local Data = p47:FindFirstChild("Data")
+	local DevilFruit
+
+	if Data then
+		local v731 = Data
+
+		Data = Data:FindFirstChild("Level")
+		DevilFruit = v731
+	else
+		DevilFruit = Data
+	end
+
+	DevilFruit = DevilFruit and DevilFruit:FindFirstChild("DevilFruit")
+
+	local t14 = { (("%*m"):format(math.floor(p48))) }
+	local v733
+
+	if Data then
+		local insert = table.insert
+		local v735 = ("Lv %*"):format(Data.Value)
+
+		insert(t14, 1, v735)
+		v733 = t14
+	else
+		v733 = t14
+	end
+
+	if DevilFruit and DevilFruit.Value ~= "" then
+		v733[#v733 + 1] = DevilFruit.Value
+	end
+
+	return table.concat(v733, " | ")
+end
+cham = function(p49, p50, p51)
+	if not t4.chams then
+		if p49.cham then
+			p49.cham.Enabled = false
+		end
+
+		return
+	end
+
+	if not p49.cham or p49.cham.Parent ~= p50 then
+		if p49.cham then
+			p49.cham:Destroy()
+		end
+
+		local Highlight = Instance.new("Highlight")
+
+		Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		Highlight.FillTransparency = 0.6
+		Highlight.Parent = p50
+		p49.cham = Highlight
+	end
+
+	p49.cham.Enabled = true
+
+	local cham_ = p49.cham
+	local s7 = "OutlineColor"
+
+	p49.cham.FillColor = p51
+	cham_[s7] = p51
+end
+paint = function(p52, p53, p54, p55)
+	local v739 = Esp.pool[p52]
+
+	if not t4.esp then
+		if v739 then
+			hide(v739)
+		end
+
+		return
+	end
+
+	local v740 = kit(p52)
+	local v741, v742, v743 = alive(p52)
+	local Magnitude = v741 and (v743.Position - p53).Magnitude or math.huge
+
+	if Magnitude > t4.espDist then
+		return hide(v740)
+	end
+
+	local v745 = tintOf(p52)
+
+	cham(v740, v741, v745)
+
+	local v746, v747 = CurrentCamera:WorldToViewportPoint(v743.Position + Vector3.new(0, 3, 0))
+	local v748, v749 = CurrentCamera:WorldToViewportPoint(v743.Position - Vector3.new(0, 3.5, 0))
+	local v750 = v746.Z <= 0
+	local v751, v752, v753, v754
+
+	if v750 then
+		v751 = v742
+		v752 = v746
+		v753 = v748
+		v754 = v750
+	else
+		v751 = v742
+		v752 = v746
+		v753 = v748
+		v754 = not (v747 or v749)
+	end
+
+	if v754 then
+		return blank(v740)
+	end
+
+	local v755 = math.max(v753.Y - v752.Y, 6)
+	local v756 = v755 * 0.6
+	local v757 = v752.X - v756 / 2
+	local Y = v752.Y
+	local edge = v740.edge
+	local box = t4.box
+	local s8 = "Visible"
+
+	v740.box[s8] = t4.box
+	edge[s8] = box
+
+	local box2 = v740.box
+	local box3 = v740.box
+	local box4 = v740.box
+	local vector2 = Vector2.new(v756, v755)
+	local vector22 = Vector2.new(v757, Y)
+
+	box2.Size = vector2
+	box3.Position = vector22
+	box4.Color = v745
+
+	local edge2 = v740.edge
+	local Position2 = v740.box.Position
+
+	v740.edge.Size = v740.box.Size
+	edge2.Position = Position2
+	v740.name.Visible = t4.name
+
+	local name = v740.name
+	local v770 = p52 == u17
+	local v771, v772, v773, text
+
+	if v770 then
+		v771 = v757
+		v772 = Y
+		v773 = name
+		text = ("[ %* ]"):format(p52.DisplayName)
+	else
+		v771 = v757
+		v772 = Y
+		v773 = name
+		text = v770
+	end
+
+	v773.Text = text or p52.DisplayName
+
+	local name2 = v740.name
+
+	v740.name.Position = Vector2.new(v752.X, v772 - 17)
+	name2.Color = v745
+	v740.info.Visible = t4.info
+	v740.info.Text = lore(p52, Magnitude)
+	v740.info.Position = Vector2.new(v752.X, v772 + v755 + 2)
+
+	local v776 = math.clamp(v751.Health / math.max(v751.MaxHealth, 1), 0, 1)
+	local v777 = Color3.fromRGB(255, 60, 60):Lerp(Color3.fromRGB(80, 230, 120), v776)
+	local fill = v740.fill
+	local bar = t4.bar
+	local s9 = "Visible"
+
+	v740.back[s9] = t4.bar
+	fill[s9] = bar
+
+	local back = v740.back
+	local back2 = v740.back
+	local vector23 = Vector2.new(v771 - 6, v772 - 1)
+	local vector24 = Vector2.new(4, v755 + 2)
+
+	back.Position = vector23
+	back2.Size = vector24
+
+	local fill2 = v740.fill
+	local fill3 = v740.fill
+	local fill4 = v740.fill
+	local vector25 = Vector2.new(v771 - 5, v772 + v755 * (1 - v776))
+	local vector26 = Vector2.new(2, v755 * v776)
+
+	fill2.Position = vector25
+	fill3.Size = vector26
+	fill4.Color = v777
+	v740.hp.Visible = t4.hpText
+	v740.hp.Text = ("%*"):format(math.floor(v751.Health))
+
+	local hp = v740.hp
+
+	v740.hp.Position = Vector2.new(v771 - 10 - v740.hp.TextBounds.X, v772 + v755 * (1 - v776) - 6)
+	hp.Color = v777
+	v740.line.Visible = t4.tracer
+
+	local line = v740.line
+	local v792 = t4.tracerFrom == "Center"
+	local v793, v794, v795, v796
+
+	if v792 then
+		v793 = v752
+		v794 = v753
+		v795 = line
+		v796 = p54 / 2
+	else
+		v793 = v752
+		v794 = v753
+		v795 = line
+		v796 = v792
+	end
+
+	v795.From = v796 or t4.tracerFrom == "Mouse" and p55 or Vector2.new(p54.X / 2, p54.Y)
+
+	local line2 = v740.line
+
+	v740.line.To = Vector2.new(v793.X, v794.Y)
+	line2.Color = v745
+end
+aimLine = function(p56, p57, p58)
+	local s10 = "Visible"
+
+	Esp.tl[s10] = false
+	Esp.mark[s10] = false
+
+	local v799 = not u18
+	local v800
+
+	if v799 then
+		v800 = v799
+	else
+		v800 = not (t4.esp or t4.aimbot or t4.silent or t4.aura or u21)
+	end
+
+	if v800 then
+		return
+	end
+
+	local v801, v802 = CurrentCamera:WorldToViewportPoint(u18.Position)
+
+	if not v802 then
+		return
+	end
+
+	local vector2 = Vector2.new(v801.X, v801.Y)
+	local v804 = t4.lineFrom == "Character"
+	local v805, v806
+
+	if v804 then
+		v805 = vector2
+		v806 = p56
+	else
+		v805 = vector2
+		v806 = v804
+	end
+
+	local mark, v808, vector22, v810
+
+	if v806 then
+		local v811 = CurrentCamera:WorldToViewportPoint(p56.Position)
+		local tl = Esp.tl
+
+		mark = Esp.mark
+		v808 = v805
+		vector22 = Vector2.new(v811.X, v811.Y)
+		v810 = tl
+	elseif t4.lineFrom == "Bottom" then
+		local tl = Esp.tl
+
+		mark = Esp.mark
+		v808 = v805
+		vector22 = Vector2.new(p57.X / 2, p57.Y)
+		v810 = tl
+	else
+		local tl = Esp.tl
+
+		mark = Esp.mark
+		v808 = v805
+		vector22 = p58
+		v810 = tl
+	end
+
+	local v815 = t5[t4.tgtColor]
+
+	v810.Visible = t4.tgtLine
+	v810.From = vector22
+	v810.To = v808
+	v810.Color = v815
+
+	local v816 = t5[t4.tgtColor]
+
+	mark.Visible = t4.tgtMark
+	mark.Position = v808
+	mark.Color = v816
+end
+
+local function step()
+	if not v706 then
+		return
+	end
+
+	local ViewportSize = CurrentCamera.ViewportSize
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local _, _, v822 = alive(LocalPlayer)
+	local v823, Position2
+
+	if v822 then
+		v823 = v822
+		Position2 = v823.Position
+	else
+		v823 = v822
+		Position2 = v822
+	end
+
+	Position2 = Position2 or CurrentCamera.CFrame.Position
+
+	local v825, v826, v827 = ipairs(Players:GetPlayers())
+	local v828 = geniter(v825, v826, v827)
+
+	while true do
+		local v829 = table.pack(v828())
+
+		if v829[1] then
+			local v830 = (v829[2])[2]
+
+			if v830 ~= LocalPlayer then
+				paint(v830, Position2, ViewportSize, mouseLocation)
+			end
+		else
+			break
+		end
+	end
+
+	Esp.fov.Visible = t4.showFov and t4.useFov and (t4.aimbot or t4.silent)
+
+	local s11 = "Radius"
+	local fov = t4.fov
+
+	Esp.fov.Position = mouseLocation
+	Esp.fov[s11] = fov
+	aimLine(v823, ViewportSize, mouseLocation)
+end
+
+Esp.step = step
+
+local function clear()
+	local v834, v835, v836 = pairs(Esp.pool)
+	local v837 = geniter(v834, v835, v836)
+
+	while true do
+		local v838 = table.pack(v837())
+
+		if v838[1] then
+			drop((v838[2])[1])
+		else
+			break
+		end
+	end
+
+	local v839, v840, v841 = ipairs({
+		"fov",
+		"tl",
+		"mark"
+	})
+	local v842 = geniter(v839, v840, v841)
+
+	while true do
+		local v843 = table.pack(v842())
+
+		if v843[1] then
+			local v844 = (v843[2])[2]
+
+			if Esp[v844] then
+				local function v845()
+					Esp[v844]:Destroy()
+				end
+
+				pcall(v845)
+			end
+
+			Esp[v844] = nil
+		else
+			break
+		end
+	end
+end
+
+Esp.clear = clear
+
+if v706 then
+	Esp.fov = draw("Circle", {
+		Thickness = 1,
+		NumSides = 64,
+		Filled = false,
+		Transparency = 0.7,
+		Color = Color3.new(1, 1, 1),
+		Visible = false
+	})
+	Esp.tl = draw("Line", {
+		Thickness = 2,
+		Visible = false
+	})
+	Esp.mark = draw("Circle", {
+		Thickness = 2,
+		NumSides = 24,
+		Radius = 8,
+		Filled = false,
+		Visible = false
+	})
+end
+
+frame = function(p59)
+	CurrentCamera = workspace.CurrentCamera
+
+	local _, v847, v848 = alive(LocalPlayer)
+	local v849, Position2
+
+	if v848 then
+		v849 = v847
+		Position2 = v848.Position
+	else
+		v849 = v847
+		Position2 = v848
+	end
+
+	u22 = Position2
+	Position = mouse.Hit.Position
+	Unit2 = u22 and (Position - u22).Unit
+
+	local v851, v852 = pick()
+
+	u17 = v851
+	u18 = v852
+	u25 = false
+	u19 = u18 and u18.Position + u18.AssemblyLinearVelocity * t4.pred
+	Unit = u19 and u22 and (u19 - u22).Unit
+	u25 = (t4.silent or os.clock() < Gun.aimUntil) and u26 and Unit ~= nil
+
+	if u17 ~= Move.lastTgt then
+		local lastTgt = Move.lastTgt
+
+		Move.lastTgt = u17
+
+		local Character = lastTgt and lastTgt.Character
+
+		Character = Character and Character:FindFirstChildOfClass("Humanoid")
+
+		if t4.killNote and Character and Character.Health <= 0 and UI.note then
+			UI.note(("Killed %*"):format(lastTgt.DisplayName), "good")
+		end
+	end
+
+	if t4.aimbot and u19 and triggered() then
+		CurrentCamera.CFrame = CurrentCamera.CFrame:Lerp(CFrame.lookAt(CurrentCamera.CFrame.Position, u19), 1 - t4.smooth ^ (p59 * 60))
+	end
+
+	local _, v856 = alive(u17)
+	local spectate = t4.spectate
+	local v858
+
+	if spectate then
+		v858 = v856
+	else
+		v858 = v856
+		v856 = spectate
+	end
+
+	if v856 then
+		local v859 = v858
+
+		if CurrentCamera.CameraSubject ~= v859 then
+			CurrentCamera.CameraSubject = v859
+		end
+
+		u27 = true
+	elseif u27 and v849 then
+		CurrentCamera.CameraSubject = v849
+		u27 = false
+	end
+
+	Esp.step()
+end
+tgtText = function()
+	if not u17 then
+		return "No target"
+	end
+
+	local v860, v861, v862 = alive(u17)
+
+	if not v860 then
+		return (("%* dead"):format(u17.DisplayName))
+	end
+
+	local v863 = v861
+	local Magnitude = u22 and (v862.Position - u22).Magnitude
+	local concat, t15, v867, v868, format, s12
+
+	if Magnitude then
+		concat = table.concat
+		t15 = {}
+
+		local format2 = ("%* (@%*)%*").format
+
+		v867 = format2("%* (@%*)%*", u17.DisplayName, u17.Name, u21 == u17 and "  LOCKED" or "")
+		v868 = ("HP %*/%*  |  %*"):format(math.floor(v863.Health), math.floor(v863.MaxHealth), lore(u17, Magnitude))
+		format = ("Team %*").format
+		s12 = "Team %*"
+	else
+		concat = table.concat
+		t15 = {}
+
+		local format2 = ("%* (@%*)%*").format
+
+		v867 = format2("%* (@%*)%*", u17.DisplayName, u17.Name, u21 == u17 and "  LOCKED" or "")
+		v868 = ("HP %*/%*  |  %*"):format(math.floor(v863.Health), math.floor(v863.MaxHealth), lore(u17, 0))
+		format = ("Team %*").format
+		s12 = "Team %*"
+	end
+
+	local Team = u17.Team
+	local v874, v875, v876, v877, Name
+
+	if Team then
+		v874 = v867
+		v875 = v868
+		v876 = format
+		v877 = s12
+		Name = u17.Team.Name
+	else
+		v874 = v867
+		v875 = v868
+		v876 = format
+		v877 = s12
+		Name = Team
+	end
+
+	local v879 = v876(v877, Name or "None")
+
+	t15[1] = v874
+	t15[2] = v875
+	t15[3] = v879
+
+	return concat(t15, "\n")
+end
+sweep = function()
+	local t16 = { LocalPlayer:FindFirstChildOfClass("PlayerGui") }
+
+	local function v881()
+		return gethui and gethui()
+	end
+
+	local ok, result = pcall(v881)
+	local v884, v885, v886
+
+	if ok then
+		v884 = t16
+
+		local v887 = result
+		local v888 = v887
+
+		v885 = typeof(v887) == "Instance"
+		v886 = v888
+	else
+		v884 = t16
+		v885 = ok
+		v886 = result
+	end
+
+	if v885 then
+		local v889 = v886
+
+		v884[#v884 + 1] = v889
+	end
+
+	local function v890()
+		return game:GetService("CoreGui")
+	end
+
+	local ok2, result2 = pcall(v890)
+
+	if ok2 and result2 then
+		local v893 = result2
+
+		v884[#v884 + 1] = v893
+	end
+
+	local v894, v895, v896 = ipairs(v884)
+	local v897 = geniter(v894, v895, v896)
+
+	while true do
+		local v898 = table.pack(v897())
+
+		if v898[1] then
+			local v899 = (v898[2])[2]
+
+			local function v900()
+				local v901, v902, v903 = ipairs(v899:GetChildren())
+				local v904 = geniter(v901, v902, v903)
+
+				while true do
+					local v905 = table.pack(v904())
+
+					if v905[1] then
+						local v906 = (v905[2])[2]
+
+						if v906.Name == "NightHub" then
+							v906:Destroy()
+						end
+					else
+						break
+					end
+				end
+			end
+
+			pcall(v900)
+		else
+			break
+		end
+	end
+end
+buildUI = function()
+	sweep()
+
+	local function v907()
+		return loadstring(game:HttpGet("https://raw.githubusercontent.com/WhiteX1208/Scripts/refs/heads/main/Ui-Library/V2Loader.luau"))()
+	end
+
+	local ok, night = pcall(v907)
+
+	if (not ok or type(night) ~= "table") and type(isfile) == "function" and type(readfile) == "function" and isfile("NightGlass.lua") then
+		ok, night = pcall(function()
+			return loadstring(readfile("NightGlass.lua"))()
+		end)
+	end
+
+	if not ok or type(night) ~= "table" then
+		genv.gethui = gethui_
+
+		return false, night
+	end
+
+	local v910 = night:CreateWindow({
+		Title = t1.Name,
+		SubTitle = t1.Game,
+		Size = UDim2.fromOffset(680, 480),
+		TabWidth = 142,
+		Key = Enum.KeyCode.RightControl,
+		MinimizeKey = Enum.KeyCode.RightControl,
+		Glass = false,
+		Settings = {
+			Save = true,
+			Main = t1.Name,
+			Folder = t1.Name,
+			Game = "BloxFruitsPvp"
+		}
+	})
+	local t17 = {
+		fight = v910:AddTab({
+			Title = "Combat",
+			Icon = "crosshair"
+		}),
+		aura = v910:AddTab({
+			Title = "Kill Aura",
+			Icon = "swords"
+		}),
+		eye = v910:AddTab({
+			Title = "Visuals",
+			Icon = "eye"
+		}),
+		body = v910:AddTab({
+			Title = "Player",
+			Icon = "user"
+		}),
+		conf = v910:AddTab({
+			Title = "Settings",
+			Icon = "settings"
+		})
+	}
+
+	genv.gethui = gethui_
+
+	local t18 = {}
+	local t19 = {}
+
+	local function note(p60, p61)
+		local function v915()
+			local Notify = night.Notify
+			local v917 = night
+			local t20 = {
+				Kind = p61 or "info"
+			}
+
+			t20.Title = t1.Name
+			t20.Content = p60
+			t20.Duration = 4
+			Notify(v917, t20)
+		end
+
+		pcall(v915)
+	end
+	local function v919(p62, p63, p64, p65)
+		t18[p63] = p62:AddParagraph({
+			Title = p64,
+			Content = "...",
+			Icon = p65
+		})
+	end
+	local function post(p66, p67)
+		local v921 = t18[p66]
+
+		if v921 then
+			local function v922()
+				v921:SetContent(p67)
+			end
+
+			pcall(v922)
+		end
+	end
+	local function v923(p68, p69)
+		local v924 = t19[p68]
+
+		if v924 then
+			local function v925()
+				v924:SetValue(p69, true)
+			end
+
+			pcall(v925)
+		end
+	end
+	local function v926(p70, p71, p72, p73)
+		local v927 = p70:AddSection(p71, p73)
+
+		local function v928()
+			v927:SetIcon(p72)
+		end
+
+		pcall(v928)
+
+		return v927
+	end
+	local function v929(p74, p75, p76, p77, p78, p79)
+		local function v930(p80)
+			t4[p75] = p80
+
+			if p79 then
+				p79(p80)
+			end
+		end
+
+		t19[p75] = p74:AddToggle(p75, {
+			Title = p76,
+			Description = p77,
+			Icon = p78,
+			Default = t4[p75],
+			Callback = v930
+		})
+	end
+	local function v931(p81, p82, p83, p84, p85, p86, p87, p88)
+		local AddSlider = p81.AddSlider
+		local v933 = p81
+		local t21 = {
+			Title = p83,
+			Description = p84,
+			Icon = p85,
+			Min = p86,
+			Max = p87,
+			Default = t4[p82]
+		}
+
+		if p88 then
+			t21.Rounding = p88
+		else
+			t21.Rounding = 0
+		end
+
+		local function callback(p89)
+			t4[p82] = p89
+		end
+
+		t21.Callback = callback
+		AddSlider(v933, p82, t21)
+	end
+	local function v936(p90, p91, p92, p93, p94, p95)
+		p90:AddDropdown(p91, {
+			Title = p92,
+			Description = p93,
+			Icon = p94,
+			Values = p95,
+			Default = t4[p91],
+			Callback = function(p96)
+				t4[p91] = p96
+			end
+		})
+	end
+	local function v937(p97, p98, p99, p100, p101)
+		p97:AddKeybind(p98, {
+			Title = p99,
+			Description = p100,
+			Icon = p101,
+			Default = t4[p98],
+			Mode = "Toggle"
+		})
+
+		local Options = night.Options and night.Options[p98]
+
+		if Options and Options.OnChanged then
+			local function v939(p102)
+				t4[p98] = keyName(p102)
+			end
+
+			Options:OnChanged(v939)
+		end
+	end
+
+	local targeting = v926(t17.fight, "Targeting", "target", "shared by aimbot, silent aim, kill aura and visuals")
+
+	v936(targeting, "pickMode", "Pick target by", "Smart scores distance, health and cursor together, finishes anyone under 25% first and only swaps target when a clearly better one shows up. The others use a single rule.", "list-filter", {
+		"Smart",
+		"Nearest cursor",
+		"Nearest distance",
+		"Lowest health"
+	})
+	v931(targeting, "smartHp", "Smart: health vs distance", "0 picks purely the closest, 100 purely the weakest. Only used by Smart.", "scale", 0, 100, 0)
+	v929(targeting, "killNote", "Kill Notify", "Shows a notification when your target dies.", "skull")
+	v936(targeting, "part", "Aim part", "Falls back to HumanoidRootPart when the part is missing.", "scan", {
+		"Head",
+		"HumanoidRootPart"
+	})
+	v929(targeting, "useFov", "Limit To FOV", "Only players inside the circle around your cursor can be picked.", "circle-dashed")
+	v931(targeting, "fov", "FOV radius", "In screen pixels.", "circle", 30, 600, 0)
+	v931(targeting, "maxDist", "Max distance", "Studs from your character.", "ruler", 50, 5000, 0)
+	v931(targeting, "pred", "Prediction", "Leads the aim point by the target's velocity times this many seconds. Raise it for slow projectiles.", "trending-up", 0, 0.5, 2)
+	v929(targeting, "teamCheck", "Team Check", "Skips other Marines while you are a Marine, the game blocks that damage anyway.", "shield")
+	v929(targeting, "wallCheck", "Wall Check", "Ignores anyone behind a wall from the camera's point of view.", "brick-wall")
+	v929(targeting, "skipFriends", "Ignore Friends", "Never picks a Roblox friend.", "heart")
+	v937(targeting, "lockKey", "Lock target key", "Press once to stick to the current target until it dies or you press again.", "lock")
+	v919(targeting, "target", "Current target", "user")
+
+	local aimbot = v926(t17.fight, "Aimbot", "crosshair")
+
+	v929(aimbot, "aimbot", "Aimbot", "Turns the camera onto the target.", "crosshair")
+	v936(aimbot, "aimTrigger", "Trigger", "When the camera is allowed to lock on.", "mouse-pointer", {
+		"Hold right mouse",
+		"Hold key",
+		"Always"
+	})
+	v937(aimbot, "aimKey", "Aim key", "Only used while Trigger is Hold key.", "keyboard")
+	v931(aimbot, "smooth", "Smoothness", "0 snaps instantly, higher values glide onto the target.", "wind", 0, 0.95, 2)
+
+	local silentAim = v926(t17.fight, "Silent Aim", "scan-eye")
+
+	local function v943(p103)
+		if not p103 then
+			return
+		end
+
+		local v944, v945 = hook()
+
+		if v944 then
+			return
+		end
+
+		t4.silent = false
+		v923("silent", false)
+		note(("Silent aim: %*"):format(v945), "warn")
+	end
+
+	v929(silentAim, "silent", "Silent Aim", "Skills, fruit clicks and guns fly at the target while your camera stays free. Every position or direction the game sends that matches where your mouse points gets swapped for the target's predicted position.", "scan-eye", v943)
+	v931(silentAim, "chance", "Hit chance", "Percent of shots that get redirected.", "percent", 1, 100, 0)
+
+	local pvPMode = v926(t17.fight, "PvP Mode", "flame")
+
+	pvPMode:AddButton({
+		Title = "PvP Mode",
+		Description = "Turns on Smart target, silent aim, Smart fly, auto skills, no stun, anti aim, auto dodge, hitbox, auto haki and ESP in one go.",
+		Icon = "flame",
+		Label = "Enable",
+		Callback = function()
+			local Options = night.Options or {}
+			local v948, v949, v950 = pairs({
+				pickMode = "Smart",
+				silent = true,
+				fly = true,
+				flyMode = "Smart",
+				autoSkill = true,
+				noStun = true,
+				antiAim = true,
+				dodge = true,
+				hitbox = true,
+				buso = true,
+				ken = true,
+				esp = true,
+				killNote = true
+			})
+			local v951 = geniter(v948, v949, v950)
+			local v952
+			local v953
+
+			while true do
+				local v954 = table.pack(v951())
+
+				if v954[1] then
+					local v955 = (v954[2])[1]
+					local v956 = (v954[2])[2]
+					local v957 = Options[v955]
+					local SetValue, v959, v960, v961
+
+					if v957 then
+						local v962 = v951
+						local v963 = v952
+						local v964 = v953
+
+						SetValue = v957.SetValue
+						v959 = v962
+						v960 = v963
+						v961 = v964
+					else
+						local v965 = v951
+
+						SetValue = v957
+
+						local v966 = v952
+
+						v959 = v965
+
+						local v967 = v953
+
+						v960 = v966
+						v961 = v967
+					end
+
+					if SetValue then
+						v951 = v959
+						v952 = v960
+						v953 = v961
+
+						local function v968()
+							v957:SetValue(v956)
+						end
+
+						pcall(v968)
+					else
+						v951 = v959
+						v952 = v960
+						v953 = v961
+						t4[v955] = v956
+					end
+				else
+					break
+				end
+			end
+
+			note("PvP Mode on", "good")
+		end
+	})
+
+	local function v969(p104)
+		if not p104 then
+			return
+		end
+
+		local v970, v971 = hook()
+
+		if v970 then
+			return
+		end
+
+		t4.autoSkill = false
+		v923("autoSkill", false)
+		note(("Auto skills: %*"):format(v971), "warn")
+	end
+
+	v929(pvPMode, "autoSkill", "Auto Skills", "Presses the chosen skill keys while the target is in range. Each press forces silent aim so the skill flies at the target.", "flame", v969)
+	pvPMode:AddDropdown("skillKeys", {
+		Title = "Skill keys",
+		Description = "Pressed in this order, Z first.",
+		Icon = "keyboard",
+		Values = {
+			"Z",
+			"X",
+			"C",
+			"V",
+			"F"
+		},
+		Multi = true,
+		Default = {
+			"Z",
+			"X",
+			"C",
+			"V"
+		},
+		Callback = function(p105)
+			t4.skillKeys = p105
+		end
+	})
+	v931(pvPMode, "skillRange", "Skill range", "Studs to the target.", "ruler", 10, 300, 0)
+	v931(pvPMode, "skillHold", "Hold time", "Seconds each key is held. Raise it for charged skills.", "timer", 0.03, 2, 2)
+	v931(pvPMode, "skillGap", "Gap between skills", "Seconds.", "timer", 0.05, 2, 2)
+
+	local hitbox = v926(t17.fight, "Hitbox", "box")
+
+	v929(hitbox, "hitbox", "Hitbox Expander", "Grows every enemy's HumanoidRootPart on your screen so melee, swords and skills connect from further away.", "box")
+	v931(hitbox, "hitboxSize", "Hitbox size", "Studs on each side.", "maximize", 4, 40, 0)
+	v929(hitbox, "hitboxShow", "Show Hitbox", "Draws the enlarged box faintly.", "eye")
+
+	local autoGun = v926(t17.fight, "Auto Gun", "target")
+
+	local function v974(p106)
+		if not p106 then
+			return
+		end
+
+		local v975, v976 = hook()
+
+		if v975 then
+			return
+		end
+
+		t4.autoGun = false
+		v923("autoGun", false)
+		note(("Auto gun: %*"):format(v976), "warn")
+	end
+
+	v929(autoGun, "autoGun", "Auto Shoot", "When the target is in range, equips the gun, aims at the target through the silent aim hook for that shot only, fires, then goes back to what you held.", "flame", v974)
+	v936(autoGun, "gunPick", "Gun", "Dragonstorm matches by name, Any gun takes the first gun in your backpack.", "crosshair", {
+		"Dragonstorm",
+		"Any gun"
+	})
+	v931(autoGun, "gunRange", "Fire range", "Studs to the target.", "locate", 20, 400, 0)
+	v931(autoGun, "gunRate", "Fire delay", "Seconds between shots.", "timer", 0.1, 2, 2)
+	v929(autoGun, "gunSkills", "Use Gun Skills", "Also presses Z and X on each shot.", "wand-2")
+	v929(autoGun, "gunBack", "Swap Back", "Re-equips your previous weapon after the shot.", "undo-2")
+	v919(autoGun, "gun", "Auto Gun", "activity")
+
+	local killAura = v926(t17.aura, "Kill Aura", "swords")
+
+	v929(killAura, "aura", "Kill Aura", "Swings your melee or sword at players in range, the hit list is built client side.", "swords")
+	v929(killAura, "auraAll", "Hit Everyone In Range", "Off means only the current target gets hit.", "users")
+	v931(killAura, "auraRange", "Range", "Studs.", "locate", 5, 100, 0)
+	v931(killAura, "auraRate", "Swing delay", "Seconds between swings.", "timer", 0.05, 1, 2)
+	v936(killAura, "auraWeapon", "Weapon", "Keep current uses whatever melee or sword you hold. Melee or Sword equips one from your backpack.", "hand", {
+		"Keep current",
+		"Melee",
+		"Sword"
+	})
+	v919(killAura, "aura", "Kill Aura", "activity")
+
+	local v978 = v926(t17.aura, "Haki & Race", "flame")
+
+	v929(v978, "buso", "Auto Buso Haki", "Turns armament back on whenever it drops.", "shield-plus")
+	v929(v978, "ken", "Auto Observation", "Fires observation every 10 seconds.", "eye")
+	v929(v978, "race", "Auto Race Ability", "Fires your race ability every 5 seconds.", "flame")
+	v978:AddButton({
+		Title = "Use race ability",
+		Icon = "flame",
+		Label = "Use",
+		Callback = function()
+			local v979, v980 = race()
+
+			if not v979 then
+				note(("Race: %*"):format(v980), "warn")
+			end
+		end
+	})
+
+	local playerEsp = v926(t17.eye, "Player ESP", "eye")
+	local v982, v983, v984, v985, v986, v987
+
+	if v706 then
+		v982 = v926
+		v983 = v929
+		v984 = v931
+		v985 = v936
+		v986 = v919
+		v987 = playerEsp
+	else
+		v982 = v926
+		v983 = v929
+		v984 = v931
+		v985 = v936
+		v986 = v919
+		v987 = playerEsp
+		v986(v987, "draw", "Drawing API", "triangle-alert")
+	end
+
+	v983(v987, "esp", "ESP", "Master switch for everything in this section.", "eye")
+	v983(v987, "box", "Box", "2D box around each player.", "square")
+	v983(v987, "name", "Name", "Display name above the box.", "type")
+	v983(v987, "info", "Info", "Level, distance and fruit under the box.", "info")
+	v983(v987, "bar", "Health Bar", "Bar on the left side of the box.", "heart-pulse")
+	v983(v987, "hpText", "Health Number", "Current HP next to the bar.", "hash")
+	v983(v987, "chams", "Chams", "Highlights bodies through walls.", "layers")
+	v983(v987, "tracer", "Tracers", "A line to every player.", "git-commit-horizontal")
+	v985(v987, "tracerFrom", "Tracer origin", "Where the lines start on screen.", "move", {
+		"Bottom",
+		"Center",
+		"Mouse"
+	})
+	v984(v987, "espDist", "ESP distance", "Studs.", "ruler", 100, 10000, 0)
+	v985(v987, "espColor", "ESP color", "Used when Team Color is off.", "palette", t6)
+	v983(v987, "teamColor", "Team Color", "Colors each player by their team.", "flag")
+
+	local targetVisuals = v982(t17.eye, "Target Visuals", "target")
+
+	v983(targetVisuals, "showFov", "Show FOV Circle", "Only drawn while aimbot or silent aim is on.", "circle-dashed")
+	v983(targetVisuals, "tgtLine", "Target Line", "Draws a line to the current target.", "spline")
+	v985(targetVisuals, "lineFrom", "Line origin", "Where the target line starts.", "move", {
+		"Character",
+		"Bottom",
+		"Mouse"
+	})
+	v983(targetVisuals, "tgtMark", "Target Marker", "Rings the target and recolors its ESP.", "crosshair")
+	v985(targetVisuals, "tgtColor", "Target color", "Color for the line, marker and target ESP.", "palette", t6)
+
+	local speed = v982(t17.body, "Speed", "gauge")
+
+	local function v990(p107)
+		if not p107 then
+			return
+		end
+
+		local v991, v992 = hook()
+
+		if not v991 then
+			note(("%*, the game may reset the value"):format(v992), "warn")
+		end
+	end
+
+	v983(speed, "speed", "Walk Speed", "Holds your WalkSpeed. The game's own writes are swapped for your value and its reads get the old value back, so it stops resetting you.", "gauge", v990)
+	v984(speed, "speedValue", "Speed", "WalkSpeed while the toggle is on.", "gauge", 16, 350, 0)
+	v983(speed, "jumpOn", "Jump Power", "Same trick for JumpPower and JumpHeight.", "arrow-up", v990)
+	v984(speed, "jumpValue", "Jump", "JumpPower while the toggle is on.", "arrow-up", 50, 400, 0)
+	v983(speed, "noclip", "Noclip", "Walk through walls.", "ghost")
+
+	local survival = v982(t17.body, "Survival", "heart-pulse")
+
+	v983(survival, "noStun", "No Stun", "Blocks the game from zeroing your speed, anchoring you, platform standing or ragdolling you, and clears the Stun and Busy values on your character when they exist.", "shield-off", v990)
+	v985(survival, "moverFilter", "Stun filter", "Smart keeps velocity pushing you the way you face, so your own dashes and flash steps still work. Remove all deletes every BodyVelocity, BodyPosition and similar mover the game puts on you.", "filter", {
+		"Smart",
+		"Remove all"
+	})
+	v983(survival, "escape", "Escape At Low HP", "Jumps you straight up once when your health drops under the limit.", "shield-alert")
+	v984(survival, "escapeHp", "HP limit", "Percent of max health.", "heart", 5, 80, 0)
+	v984(survival, "escapeUp", "Escape height", "Studs.", "arrow-up", 50, 1000, 0)
+
+	local flyToTarget = v982(t17.body, "Fly To Target", "plane")
+
+	v983(flyToTarget, "fly", "Fly To Target", "Flies to the current target. Kite stays behind its back at a safe distance and sways sideways. Predict parks where it is heading, in front of it, so it gets hit. Orbit circles around it.", "plane")
+	v937(flyToTarget, "flyKey", "Fly key", "Toggles Fly To Target.", "keyboard")
+	v985(flyToTarget, "flyMode", "Mode", "Smart attacks from behind when the fight is in your favour and kites when it is not. Kite always keeps distance, Predict parks in front, Orbit circles.", "compass", {
+		"Smart",
+		"Kite",
+		"Predict",
+		"Orbit"
+	})
+	v984(flyToTarget, "engageDist", "Smart: attack distance", "Studs behind the target while attacking.", "swords", 3, 30, 0)
+	v984(flyToTarget, "engageEdge", "Smart: HP disadvantage allowed", "Still attacks while your HP percent is up to this much lower than the target's.", "scale", 0, 50, 0)
+	v984(flyToTarget, "retreatHp", "Smart: retreat below HP", "Your HP percent that switches to kiting.", "heart", 10, 80, 0)
+	v984(flyToTarget, "gankRange", "Smart: gank range", "Two or more enemies this close makes you back off.", "users", 20, 150, 0)
+	v984(flyToTarget, "kiteDist", "Kite distance", "Studs behind the target in Kite mode.", "ruler", 8, 80, 0)
+	v984(flyToTarget, "kiteSway", "Kite sway", "How far you swing side to side in Kite mode.", "move", 0, 20, 0)
+	v984(flyToTarget, "flySpeed", "Speed", "Studs per second.", "gauge", 50, 400, 0)
+	v984(flyToTarget, "flySafe", "Speed after pull back", "Used for 6 seconds whenever the server snaps you back, then it tries the normal speed again.", "gauge", 50, 400, 0)
+	v984(flyToTarget, "flyDist", "Distance", "Studs from the target in Predict mode.", "ruler", 2, 20, 0)
+	v984(flyToTarget, "flyUp", "Height", "Studs above the target.", "arrow-up", 0, 30, 0)
+	v984(flyToTarget, "orbitRadius", "Orbit radius", "Studs.", "circle", 4, 40, 0)
+	v984(flyToTarget, "orbitSpeed", "Orbit speed", "Radians per second.", "rotate-cw", 0.5, 8, 1)
+	v983(flyToTarget, "flyNoclip", "Noclip While Flying", "Passes through walls on the way.", "ghost")
+	v986(flyToTarget, "fly", "Fly", "activity")
+
+	local defense = v982(t17.body, "Defense", "shield")
+
+	v983(defense, "antiAim", "Anti Aim", "Other players see a fake random velocity on you while you move normally, so aimbots and silent aims that lead their shots by your velocity miss.", "shield")
+	v984(defense, "antiAimPower", "Anti aim strength", "Size of the fake velocity.", "gauge", 50, 1000, 0)
+	v983(defense, "dodge", "Auto Dodge", "Side steps when an enemy in range turns to face you.", "move")
+	v984(defense, "dodgeRange", "Dodge range", "Studs.", "ruler", 8, 60, 0)
+	v984(defense, "dodgeDist", "Dodge distance", "Studs per side step.", "move", 5, 40, 0)
+	v984(defense, "dodgeCd", "Dodge cooldown", "Seconds between side steps.", "timer", 0.3, 5, 1)
+
+	local targetMovement = v982(t17.body, "Target Movement", "move")
+
+	v983(targetMovement, "stick", "Stick To Target", "Pins you behind and above the target every frame. Only engages inside the range below so it never jumps across the map.", "magnet")
+	v984(targetMovement, "stickUp", "Height", "Studs above the target.", "arrow-up", 0, 80, 0)
+	v984(targetMovement, "stickBack", "Behind", "Studs behind the target.", "arrow-left", 1, 15, 0)
+	v984(targetMovement, "stickRange", "Engage range", "Studs.", "locate", 20, 300, 0)
+	v983(targetMovement, "spectate", "Spectate Target", "Moves your camera onto the target.", "video")
+	v983(v982(t17.body, "Movement", "footprints"), "infJump", "Infinite Jump", "Jump again in mid air.", "arrow-up-from-line")
+
+	local misc = v982(t17.conf, "Misc", "settings")
+
+	local function v998()
+		local v999, v1000 = antiAfk()
+
+		if not v999 then
+			note(("Anti AFK: %*"):format(v1000), "warn")
+		end
+	end
+
+	v983(misc, "antiAfk", "Anti AFK", "Disables the idle kick connection.", "coffee", v998)
+	misc:AddKeybind("uiKey", {
+		Title = "Toggle key",
+		Description = "Click the box on the right, then press a new key.",
+		Icon = "keyboard",
+		Default = "RightControl",
+		Mode = "Toggle"
+	})
+
+	local Options = night.Options
+	local v1002, uiKey
+
+	if Options then
+		v1002 = misc
+		uiKey = night.Options.uiKey
+	else
+		v1002 = misc
+		uiKey = Options
+	end
+
+	if uiKey and uiKey.OnChanged then
+		local function v1004(p108)
+			v910:SetKey(p108)
+		end
+
+		uiKey:OnChanged(v1004)
+	end
+
+	v1002:AddButton({
+		Title = "Unload",
+		Description = "Stops every loop, removes the drawings and closes this window.",
+		Icon = "power",
+		Label = "Unload",
+		Callback = function()
+			local function v1005()
+				if genv.NightPvp then
+					genv.NightPvp.Unload()
+				end
+			end
+
+			v910:Dialog({
+				Title = "Unload the script",
+				Content = "Everything turns off and the window closes.",
+				Buttons = {
+					{
+						Title = "Unload",
+						Filled = true,
+						Callback = v1005
+					},
+					{
+						Title = "Cancel"
+					}
+				}
+			})
+		end
+	})
+
+	if t17.conf.AddInterface then
+		local function v1006()
+			t17.conf:AddInterface()
+		end
+
+		pcall(v1006)
+	end
+
+	if not v706 then
+		post("draw", "Your executor has no Drawing API, only Chams will show")
+	end
+
+	local s13 = "mirror"
+
+	UI.Night = night
+	UI.Window = v910
+	UI.note = note
+	UI.post = post
+	UI[s13] = v923
+
+	return true
+end
+unload = function()
+	u11 = false
+	u25 = false
+
+	local function v1008()
+		RunService:UnbindFromRenderStep("NightPvpAim")
+	end
+
+	pcall(v1008)
+
+	if u27 then
+		local _, v1010 = alive(LocalPlayer)
+
+		if v1010 then
+			CurrentCamera.CameraSubject = v1010
+		end
+	end
+
+	local v1011, v1012, v1013 = ipairs(t2)
+	local v1014 = geniter(v1011, v1012, v1013)
+
+	while true do
+		local v1015 = table.pack(v1014())
+
+		if v1015[1] then
+			local v1016 = (v1015[2])[2]
+
+			local function v1017()
+				v1016:Disconnect()
+			end
+
+			pcall(v1017)
+		else
+			break
+		end
+	end
+
+	table.clear(t2)
+
+	local v1018 = t4
+	local v1019 = t4
+	local v1020 = t4
+	local v1021 = t4
+	local v1022 = t4
+	local v1023 = t4
+	local v1024 = t4
+	local v1025 = t4
+
+	t4.speed = false
+	v1018.jumpOn = false
+	v1019.noclip = false
+	v1020.autoGun = false
+	v1021.noStun = false
+	v1022.fly = false
+	v1023.hitbox = false
+	v1024.antiAim = false
+	v1025.dodge = false
+	t4.autoSkill = false
+	pcall(antiAimStep)
+	pcall(hitboxes)
+	pcall(movement)
+	pcall(noclip)
+	Move.on = false
+	pcall(Esp.clear)
+
+	if not (UI.Night and UI.Night.Glass) then
+		local function v1026()
+			UI.Window:Close()
+		end
+
+		pcall(v1026)
+	end
+
+	local function v1027()
+		UI.Night:Destroy()
+	end
+
+	pcall(v1027)
+	genv.NightPvp = nil
+end
+
+local ok, result, result2 = pcall(buildUI)
+
+genv.gethui = gethui_
+
+if not ok or not result then
+	local warn_ = warn
+	local format = ("! UI: %*").format
+	local s14 = "! UI: %*"
+	local v1034, v1035, v1036, v1037, v1038
+
+	if ok then
+		v1034 = result
+		v1035 = result2
+		v1036 = warn_
+		v1037 = format
+		v1038 = s14
+	else
+		local v1039 = ok
+
+		v1034 = result
+		v1035 = v1039
+		v1036 = warn_
+		v1037 = format
+		v1038 = s14
+	end
+
+	local v1040, v1041, v1042
+
+	if v1035 then
+		v1034 = v1035
+		v1040 = v1036
+		v1041 = v1037
+		v1042 = v1038
+	else
+		v1040 = v1036
+		v1041 = v1037
+		v1042 = v1038
+	end
+
+	local v1043 = v1041(v1042, v1034)
+
+	v1040(v1043)
+	Esp.clear()
+
+	return
+end
+
+local v1044, v1045, v1046 = ipairs(Players:GetPlayers())
+local v1047 = geniter(v1044, v1045, v1046)
+
+while true do
+	local v1048 = table.pack(v1047())
+
+	if v1048[1] then
+		befriend((v1048[2])[2])
+	else
+		break
+	end
+end
+
+bind(Players.PlayerAdded:Connect(befriend))
+bind(Players.PlayerRemoving:Connect(function(player)
+	drop(player)
+	t3[player.UserId] = nil
+
+	if u21 == player then
+		u21 = nil
+	end
+end))
+bind(UserInputService.InputBegan:Connect(function(input)
+	if UserInputService:GetFocusedTextBox() or input.KeyCode.Name ~= t4.lockKey then
+		return
+	end
+
+	if u21 then
+		u21 = nil
+		UI.note("Target unlocked")
+
+		return
+	end
+
+	if not u17 then
+		return UI.note("No target", "warn")
+	end
+
+	u21 = u17
+
+	local v1049 = ("Locked %*"):format(u17.DisplayName)
+
+	UI.note(v1049)
+end))
+bind(UserInputService.InputBegan:Connect(function(input)
+	if UserInputService:GetFocusedTextBox() or t4.flyKey == "None" or input.KeyCode.Name ~= t4.flyKey then
+		return
+	end
+
+	t4.fly = not t4.fly
+	UI.mirror("fly", t4.fly)
+	UI.note(t4.fly and "Fly on" or "Fly off")
+end))
+bind(UserInputService.JumpRequest:Connect(function()
+	if not t4.infJump then
+		return
+	end
+
+	local _, v1051 = alive(LocalPlayer)
+
+	if v1051 then
+		v1051:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+end))
+bind(RunService.Heartbeat:Connect(stick))
+bind(RunService.Heartbeat:Connect(function()
+	pcall(movement)
+end))
+bind(RunService.Stepped:Connect(function()
+	pcall(antiAimStep)
+
+	if t4.noclip or t4.fly or next(Move.clip) then
+		pcall(noclip)
+	end
+end))
+bind(RunService.Heartbeat:Connect(function(dt)
+	pcall(fly, dt)
+	pcall(sweepMovers)
+	pcall(antiAimBeat)
+end))
+watchMovers(LocalPlayer.Character)
+bind(LocalPlayer.CharacterAdded:Connect(watchMovers))
+spin("Hitbox", 0.3, hitboxes)
+spin("Dodge", 0.05, dodge)
+spin("Crowd", 0.25, crowd)
+spin("Skills", 0.1, function()
+	if t4.autoSkill then
+		return skills()
+	end
+end)
+
+local function v1052()
+	return t4.autoGun and t4.gunRate or 0.3
+end
+
+spin("Gun", v1052, function()
+	if not t4.autoGun then
+		Gun.note = "Off"
+
+		return
+	end
+
+	local _, v1054 = shoot()
+
+	Gun.note = v1054
+end)
+spin("Escape", 0.1, escape)
+RunService:BindToRenderStep("NightPvpAim", Enum.RenderPriority.Camera.Value + 1, frame)
+
+local function v1055()
+	return t4.aura and t4.auraRate or 0.3
+end
+local function v1056()
+	if not t4.aura then
+		Aura.note = "Off"
+
+		return
+	end
+
+	local _, v1058 = swing()
+
+	Aura.note = v1058
+end
+
+spin("Aura", v1055, v1056)
+spin("Buso", 2, function()
+	if t4.buso then
+		return buso()
+	end
+end)
+spin("Ken", 10, function()
+	if t4.ken then
+		return ken()
+	end
+end)
+spin("Race", 5, function()
+	if t4.race then
+		return race()
+	end
+end)
+spin("Panels", 0.5, function()
+	UI.post("target", tgtText())
+
+	local v1059 = ("Swings %*  |  %*"):format(Aura.swings, Aura.note)
+
+	UI.post("aura", v1059)
+
+	local v1060 = ("Shots %*  |  %*"):format(Gun.shots, Gun.note)
+
+	UI.post("gun", v1060)
+	UI.post("fly", Fly.note)
+end)
+
+if t4.antiAfk then
+	antiAfk()
+end
+
+genv.NightPvp = {
+	Hub = t1,
+	State = t4,
+	Aura = Aura,
+	Esp = Esp,
+	Unload = unload
+}
+
+local note = UI.note
+local v1062 = ("Ready - %* build %*"):format(t1.Game, t1.Build)
+
+note(v1062)
