@@ -1,1 +1,1822 @@
+-- This file was generated at discord.gg/syncrypt
 
+local t1 = {
+	value13 = 27088934891846,
+	value2 = nil
+}
+
+t1.value2 = loadstring
+
+local game_ = game
+
+t1.value6 = 18063688655067
+t1.value5 = "HttpGet"
+t1.value2 = t1.value2(game_:HttpGet("https://raw.githubusercontent.com/SlimexDev/SlimeUI/v1.3.0/dist/SlimeUI.lua"))()
+
+local game_2 = game
+local GetService = game_2.GetService
+
+t1.value10 = 573525377291
+t1.value7 = "b!\133*\0179\8"
+
+local players = GetService(game_2, "Players")
+local RunService = game:GetService("RunService")
+
+t1.value4 = "game"
+t1.value8 = 32235748178594
+
+local t2 = {
+	value1 = RunService
+}
+local game_3 = game
+
+t1.value6 = "\189Ї\190\130\192\141\23\254\246\253j\184E\150\219"
+t1.value4 = "GetService"
+t1.value4 = game_3:GetService("UserInputService")
+t1.value5 = game:GetService("TeleportService")
+t2.value2 = t1.value5
+t1.value5 = game
+t1.value8 = "||\229\2\5\24\214+"
+t1.value3 = "GetService"
+t1.value3 = t1.value5:GetService("VirtualUser")
+t1.value12 = "\188\2kc\183j\252h\19\146\205ˏ8\4\225\146D\167\237-\226"
+t1.value7 = "game"
+t2.value3 = t1.value3
+t1.value3 = game
+t1.value7 = "GetService"
+t1.value11 = 4828406859976
+t1.value7 = t1.value3:GetService("ReplicatedStorage")
+t1.value3 = players.LocalPlayer
+t2.value4 = t1.value3
+t2.value5 = "Slime Hub"
+t2.value6 = "https://discord.gg/byCb2j9Ren"
+t1.value9 = {
+	[10766972131] = "Throw Food For Animals"
+}
+t1.value14 = 27139736252765
+t2.value7 = t1.value9
+t1.value10 = (function()
+	if t2.value7[game.GameId] then
+		return t2.value7[game.GameId]
+	end
+
+	local MarketplaceService = game:GetService("MarketplaceService")
+
+	for _, v in ipairs({ "GetProductInfoAsync", "GetProductInfo" }) do
+		local ok, result = pcall(function()
+			return MarketplaceService[v](MarketplaceService, game.PlaceId, Enum.InfoType.Asset)
+		end)
+
+		if ok then
+			ok = type(result) == "table"
+
+			if ok then
+				local Name = result.Name
+
+				ok = type(Name) == "string"
+
+				if ok then
+					ok = result.Name ~= ""
+				end
+			end
+		end
+
+		if ok then
+			return result.Name
+		end
+	end
+
+	return "Roblox"
+end)()
+t1.value12 = t2.value5
+t1.value13 = Enum.KeyCode.RightShift
+
+local v15 = t1.value2:CreateWindow({
+	Title = t1.value12,
+	Subtitle = t1.value10,
+	Theme = "Glass",
+	Opacity = 1,
+	ToggleKey = t1.value13,
+	ToggleButton = true,
+	SettingsTab = true,
+	Folder = "SlimeHub",
+	Compact = false
+})
+
+function t1.value12()
+	local Character = t2.value4.Character
+
+	if not Character then
+		return Character
+	end
+
+	Character = Character:FindFirstChild("HumanoidRootPart")
+
+	return Character
+end
+
+t2.value8 = v15
+
+function t2.value9()
+	local Character = t2.value4.Character
+
+	if not Character then
+		return Character
+	end
+
+	Character = Character:FindFirstChildOfClass("Humanoid")
+
+	return Character
+end
+
+t2.value10 = t1.value12
+
+local value1 = t1.value1
+
+function t2.value11(p1, p2)
+	t2.value8:Notify({
+		Title = t2.value5,
+		Content = p1,
+		Type = p2 or "Info",
+		Duration = 3
+	})
+end
+function t2.value12(p3, p4)
+	local setclipboard_ = setclipboard
+	local ok
+
+	if type(setclipboard_) == "function" then
+		ok = pcall(setclipboard, p3)
+	else
+		ok = false
+	end
+
+	if ok then
+		t2.value11(p4 .. " copied to clipboard!", "Success")
+	else
+		local value8 = t2.value8
+		local value5 = t2.value5
+
+		value8.Notify(value8, {
+			Title = value5,
+			Content = "Could not copy. " .. p3,
+			Type = "Warning",
+			Duration = 8
+		})
+	end
+end
+
+t2.value13 = {}
+t2.value14 = {}
+
+local getgenv_ = getgenv
+local genv
+
+if type(getgenv_) == "function" then
+	genv = getgenv()
+else
+	genv = false
+end
+
+t1.value1 = t1.value1
+
+local _G_ = genv or _G
+
+t1.value1 = value1
+t2.value15 = _G_
+t2.value15.SlimeHubThrowFoodRun = t2.value14
+
+function t2.value13.Alive()
+	return t2.value15.SlimeHubThrowFoodRun == t2.value14
+end
+
+t1.value14 = t2.value4:WaitForChild("PlayerScripts"):WaitForChild("Client"):WaitForChild("Controllers")
+
+local function v26(p5, p6)
+	local v27 = p5:WaitForChild(p6, 15)
+
+	if v27 then
+		local ok, result = pcall(require, v27)
+
+		return ok and result and result or nil
+	else
+		return nil
+	end
+end
+
+t2.value13.Data = v26(t1.value14, "DataController")
+t2.value13.State = v26(t1.value14, "ClientState")
+t2.value13.Throw = v26(t1.value14, "ThrowController")
+t2.value13.Meter = v26(t1.value14, "ThrowMeter")
+t2.value13.Training = v26(t1.value14, "TrainingController")
+t2.value13.Offline = v26(t1.value14, "OfflineEarnings")
+t2.value13.MeterMath = v26(t1.value7:WaitForChild("Shared"), "ThrowMeterMath")
+t2.value13.Curve = v26(t1.value7.Shared, "BalanceCurve")
+
+local Config = t1.value7:WaitForChild("Config")
+
+t2.value13.Foods = v26(Config, "FoodsConfig")
+t2.value13.Stands = v26(Config, "StandsConfig")
+t2.value13.Fence = v26(Config, "FenceConfig")
+t2.value13.Remotes = t1.value7:WaitForChild("Remotes")
+t2.value13.GameConfig = v26(Config, "GameConfig")
+t2.value13.RemotesModule = v26(t1.value7.Shared, "Remotes")
+t2.value13.POVTest = v26(t1.value7.Shared, "POVTest")
+t2.value13.Economy = v26(Config, "AnimalEconomy")
+t2.value13.Rarity = v26(Config, "RarityConfig")
+t2.value13.Mutations = v26(Config, "MutationsConfig")
+
+local getgenv_2 = getgenv
+
+t2.value16 = type(getgenv_2) == "function" and getgenv() or _G
+t2.value17 = t2.value16.SlimeHubThrowFoodOrig
+
+if not t2.value17 then
+	t2.value17 = {}
+
+	local GameConfig = t2.value13.GameConfig
+
+	if GameConfig then
+		GameConfig = t2.value13.GameConfig.Sequence
+	end
+
+	if GameConfig then
+		t1.value13 = t2.value17
+		t1.value15 = GameConfig.ShowTimeShort
+		t1.value17 = GameConfig.ShowTimeNormal
+		t1.value20 = GameConfig.SkipAfterRevealDelay
+		t1.value21 = GameConfig.POVDuration
+
+		local sequence = {
+			ShowTimeShort = t1.value15,
+			ShowTimeNormal = t1.value17,
+			SkipAfterRevealDelay = t1.value20,
+			POVDuration = t1.value21
+		}
+
+		t1.value13.Sequence = sequence
+	end
+
+	t1.value13 = t2.value17
+
+	local s1 = "Invoke"
+
+	t1.value15 = t2.value13.RemotesModule
+
+	local value15 = t1.value15
+
+	if t1.value15 then
+		value15 = t2.value13.RemotesModule.Invoke
+	end
+
+	t1.value13[s1] = value15
+	t1.value13 = t2.value17
+
+	local s2 = "Duration"
+
+	t1.value18 = t1.value1
+	t1.value15 = t2.value13.POVTest
+
+	local value152 = t1.value15
+
+	if t1.value15 then
+		value152 = t2.value13.POVTest.Duration
+	end
+
+	t1.value13[s2] = value152
+	t1.value13 = t2.value16
+	t1.value1 = t1.value18
+
+	local value17 = t2.value17
+
+	t1.value13.SlimeHubThrowFoodOrig = value17
+end
+
+local RemotesModule = t2.value13.RemotesModule
+
+if RemotesModule then
+	RemotesModule = t2.value17.Invoke
+end
+
+if RemotesModule then
+	function t2.value13.RemotesModule.Invoke(p7, ...)
+		local v40 = t2.value17.Invoke(p7, ...)
+		local SlimeHubThrowFoodSkip = t2.value16.SlimeHubThrowFoodSkip
+
+		if SlimeHubThrowFoodSkip then
+			SlimeHubThrowFoodSkip = p7 == "Throw_Resolve"
+
+			if SlimeHubThrowFoodSkip then
+				if type(v40) == "table" then
+					SlimeHubThrowFoodSkip = v40.Ok
+				else
+					SlimeHubThrowFoodSkip = false
+				end
+			end
+		end
+
+		if not SlimeHubThrowFoodSkip then
+			return v40
+		end
+
+		local FlightTime = v40.FlightTime
+		local v43 = tonumber(FlightTime) or 1
+
+		v40.FlightTime = math.min(v43, 0.8)
+		v40.CanSkip = true
+
+		return v40
+	end
+end
+
+local POVTest = t2.value13.POVTest
+
+if POVTest then
+	POVTest = t2.value17.Duration
+end
+
+if POVTest then
+	function t2.value13.POVTest.Duration(...)
+		return t2.value16.SlimeHubThrowFoodSkip and 0.6 or t2.value17.Duration(...)
+	end
+end
+
+function t2.value13.SetSkip(p8)
+	t2.value16.SlimeHubThrowFoodSkip = p8 and true or false
+
+	local GameConfig = t2.value13.GameConfig
+
+	if not GameConfig then
+		v53 = t2.value17.Sequence
+
+		if GameConfig and v53 then
+			GameConfig.ShowTimeShort = p8 and 0.4 or v53.ShowTimeShort
+			GameConfig.ShowTimeNormal = p8 and 0.4 or v53.ShowTimeNormal
+			GameConfig.SkipAfterRevealDelay = p8 and 0.1 or v53.SkipAfterRevealDelay
+			GameConfig.POVDuration = p8 and 0.6 or v53.POVDuration
+		end
+
+		return
+	end
+
+	GameConfig = t2.value13.GameConfig.Sequence
+
+	local Sequence = t2.value17.Sequence
+
+	if GameConfig and Sequence then
+		GameConfig.ShowTimeShort = p8 and 0.4 or Sequence.ShowTimeShort
+		GameConfig.ShowTimeNormal = p8 and 0.4 or Sequence.ShowTimeNormal
+		GameConfig.SkipAfterRevealDelay = p8 and 0.1 or Sequence.SkipAfterRevealDelay
+		GameConfig.POVDuration = p8 and 0.6 or Sequence.POVDuration
+	end
+end
+
+t1.value14 = {
+	Training_TapBonus = true,
+	Shop_Buy = true,
+	Shop_Equip = true,
+	Stand_Upgrade = true,
+	Plot_UpgradeFence = true,
+	Offline_Claim = true,
+	Shop_ClaimFree = true,
+	Plot_EquipBest = true,
+	Plot_SellAll = true,
+	Plot_SellAnimal = true
+}
+t2.value18 = t1.value14
+
+function t2.value13.Invoke(p9, ...)
+	if not t2.value18[p9] then
+		return {
+			Ok = false,
+			Reason = "NotAllowed"
+		}
+	end
+
+	local v47 = t2.value13.Remotes:FindFirstChild(p9)
+
+	if not v47 then
+		return {
+			Ok = false,
+			Reason = "Missing"
+		}
+	end
+
+	local ok, result = pcall(v47.InvokeServer, v47, ...)
+
+	if not ok then
+		return not ok and {
+			Ok = false,
+			Reason = "Error"
+		} or result
+	end
+
+	ok = type(result) == "table"
+
+	return not ok and {
+		Ok = false,
+		Reason = "Error"
+	} or result
+end
+function t2.value13.Get(p10)
+	if t2.value13.Data then
+		local ok, result = pcall(t2.value13.Data.Get, t2.value13.Data, p10)
+
+		if ok then
+			return result
+		else
+			return nil
+		end
+	else
+		return nil
+	end
+end
+function t2.value13.Money()
+	local Get = t2.value13.Get
+
+	return tonumber(Get("Money")) or 0
+end
+function t2.value13.Busy()
+	local State = t2.value13.State
+
+	if not State then
+		return State or false
+	end
+
+	State = State.Busy or State.OfflineOpen
+
+	return State or false
+end
+function t2.value13.Price(p11)
+	local Curve = t2.value13.Curve
+
+	if Curve then
+		Curve = t2.value13.Curve.GetItemPrice
+	end
+
+	local Price
+
+	if not Curve then
+		Price = p11.Price
+
+		return tonumber(Price) or math.huge
+	end
+
+	local ok, result = pcall(t2.value13.Curve.GetItemPrice, t2.value4, p11)
+
+	if ok then
+	elseif ok then
+		return tonumber(result)
+	else
+		Price = p11.Price
+
+		return tonumber(Price) or math.huge
+	end
+
+	ok = tonumber(result)
+
+	if ok then
+		return tonumber(result)
+	else
+		Price = p11.Price
+
+		return tonumber(Price) or math.huge
+	end
+end
+function t2.value19(p12, p13)
+	local v58 = t2.value10()
+
+	if not v58 then
+		return false
+	end
+
+	if not (p13 < (v58.Position - p12).Magnitude) then
+		return true
+	end
+
+	v58.AssemblyLinearVelocity = Vector3.zero
+	v58.CFrame = CFrame.new(p12, p12 + Vector3.new(0, 0, 1))
+	task.wait(0.4)
+
+	return true
+end
+function t2.value13.CrossThrowLine()
+	local StarterArea = workspace:FindFirstChild("StarterArea")
+
+	if not StarterArea then
+		return false
+	end
+
+	local CrossLine = StarterArea:FindFirstChild("CrossLine")
+
+	if not CrossLine then
+		v73 = CrossLine or StarterArea.Position.Z + StarterArea.Size.Z / 2
+		v74 = StarterArea.Position.X
+		v75 = StarterArea.Position.Y + StarterArea.Size.Y / 2 + 3
+		t2.value19(Vector3.new(v74, v75, v73 + 3), 1)
+		task.wait(0.6)
+
+		return t2.value19(Vector3.new(v74, v75, v73 - 1.5), 0.5)
+	end
+
+	CrossLine = CrossLine.Position.Z
+
+	local v61 = CrossLine or StarterArea.Position.Z + StarterArea.Size.Z / 2
+	local X = StarterArea.Position.X
+	local v63 = StarterArea.Position.Y + StarterArea.Size.Y / 2 + 3
+
+	t2.value19(Vector3.new(X, v63, v61 + 3), 1)
+	task.wait(0.6)
+
+	return t2.value19(Vector3.new(X, v63, v61 - 1.5), 0.5)
+end
+function t2.value13.EnterTrainSpot()
+	local LocalPlotProps = workspace:FindFirstChild("LocalPlotProps")
+
+	if LocalPlotProps then
+		LocalPlotProps = LocalPlotProps:FindFirstChild("TrainingSpot", true)
+	end
+
+	local isBasePart
+
+	if LocalPlotProps then
+		isBasePart = LocalPlotProps:IsA("BasePart")
+	else
+		isBasePart = LocalPlotProps
+	end
+
+	if not isBasePart then
+		return false
+	end
+
+	local v66 = LocalPlotProps.Position + Vector3.new(0, 3, 0)
+	local v67 = t2.value10()
+
+	if v67 then
+		v67 = (v67.Position - v66).Magnitude <= 4
+	end
+
+	if not v67 then
+		return t2.value19(v66, 1)
+	end
+
+	t2.value19(v66 + Vector3.new(0, 0, 14), 1)
+	task.wait(0.4)
+
+	return t2.value19(v66, 1)
+end
+function t2.value13.AtPrompt(p14, p15, p16)
+	local LocalPlotProps = workspace:FindFirstChild("LocalPlotProps")
+	local v69 = t2.value10()
+
+	if not (LocalPlotProps and v69) or t2.value13.Busy() then
+		return {
+			Ok = false,
+			Reason = "NotReady"
+		}
+	end
+
+	local GetDescendants = LocalPlotProps.GetDescendants
+	local ipairs_ = ipairs
+	local v72, v76, v77 = ipairs_(GetDescendants(LocalPlotProps))
+	local Parent = nil
+
+	while true do
+		local v78
+
+		v77, v78 = v72(v76, v77)
+
+		if not v77 then
+			break
+		end
+
+		local isProximityPrompt = v78:IsA("ProximityPrompt")
+
+		if isProximityPrompt then
+			isProximityPrompt = v78.Name == p14
+
+			if isProximityPrompt then
+				isProximityPrompt = not p15 or v78.Parent.Name == p15
+			end
+		end
+
+		if isProximityPrompt then
+			Parent = v78.Parent
+
+			break
+		end
+	end
+
+	if not Parent then
+		return {
+			Ok = false,
+			Reason = "NoPrompt"
+		}
+	end
+
+	local WorldPosition = Parent:IsA("Attachment") and Parent.WorldPosition or Parent.Position
+	local CFrame_ = v69.CFrame
+
+	v69.CFrame = CFrame.new(WorldPosition + Vector3.new(0, 3, 0))
+	task.wait(0.35)
+
+	local v80 = t2.value13.Invoke(p16)
+
+	task.wait(0.15)
+
+	if t2.value10() ~= v69 then
+		return v80
+	end
+
+	v69.CFrame = CFrame_
+
+	return v80
+end
+
+local value8 = t2.value8
+
+t1.value17 = "c\205/\252"
+t1.value13 = "Tab"
+t1.value13 = value8:Tab("Home", "home", "Info and community")
+t1.value13:Section(t2.value5)
+
+local v82 = "Welcome to " .. t2.value5
+local Paragraph = t1.value13.Paragraph
+
+t1.value17 = 20871772562935
+Paragraph(t1.value13, v82, "Pick a tab on the left to get started.")
+t1.value13:Label("Developer: SlimexDev")
+
+local Label = t1.value13.Label
+
+t1.value17 = 10160464695931
+Label(t1.value13, "Version: 1.0.0")
+t1.value13:Section("Game")
+t1.value15 = game.PlaceId
+t1.value13:Paragraph(t1.value10, "Place ID: " .. t1.value15 .. "  |  Game ID: " .. game.GameId)
+t1.value13.Button(t1.value13, {
+	Name = "Copy Game ID",
+	Description = "Use it as the key in GameNames",
+	Icon = "copy",
+	ButtonText = "Copy",
+	Callback = function()
+		local value12 = t2.value12
+		local GameId = game.GameId
+
+		value12(tostring(GameId), "Game ID")
+	end
+})
+t1.value16 = "\127\214;\252t5O\151\u{95}"
+t1.value17 = 24128942468067
+t1.value13:Section("Key Status")
+
+local value12 = t1.value1
+local value13 = t1.value1
+
+t1.value15 = value12
+t1.value17 = value13
+
+local SlimeKey_ = SlimeKey
+local SlimeKey_2
+
+if type(SlimeKey_) == "table" then
+	SlimeKey_2 = SlimeKey
+else
+	SlimeKey_2 = false
+end
+
+t1.value16 = SlimeKey_2
+
+local value16 = t1.value16
+local value17 = t1.value17
+
+t1.value18 = value16
+t1.value1 = value17
+
+if not t1.value16 then
+	t1.value18 = t1.value2.KeyInfo
+end
+
+local t3 = {
+	Info = t1.value18
+}
+
+t1.value1 = t1.value15
+t1.value19 = 30326012753705
+t1.value17 = 32238487075492
+t1.value13:KeyStatus(t3)
+t1.value13:Section("Community")
+t1.value16 = t2.value6
+
+local Button = t1.value13.Button
+local t4 = {
+	Name = "Discord Server",
+	Description = t1.value16,
+	Icon = "copy",
+	ButtonText = "Copy Link",
+	Style = "Primary",
+	Callback = function()
+		t2.value12(t2.value6, "Discord link")
+	end
+}
+
+t1.value19 = 9637392486791
+t1.value17 = "[y\136\245"
+Button(t1.value13, t4)
+
+local Main = t2.value8:Tab("Main", "swords", "Throw and train")
+
+function t1.value15()
+	if not t2.value13.Training then
+		return false
+	end
+
+	local ok, result = pcall(t2.value13.Training.IsRunning)
+
+	if not ok then
+		return ok
+	end
+
+	ok = result == true
+
+	return ok
+end
+function t1.value18(p17)
+	local Meter = t2.value13.Meter
+	local ok, result
+
+	if not Meter then
+		if Meter then
+			if p17 then
+				ok, result = pcall(t2.value13.MeterMath.HalfPeriod)
+				t2.value13.Meter.TestAutoTap = (ok and result or 1.08) - 0.01
+
+				return
+			else
+				t2.value13.Meter.TestAutoTap = nil
+
+				return
+			end
+		end
+
+		return
+	end
+
+	Meter = t2.value13.MeterMath
+
+	if Meter then
+		if p17 then
+			ok, result = pcall(t2.value13.MeterMath.HalfPeriod)
+			t2.value13.Meter.TestAutoTap = (ok and result or 1.08) - 0.01
+
+			return
+		else
+			t2.value13.Meter.TestAutoTap = nil
+
+			return
+		end
+	end
+end
+
+t2.value20 = t1.value2.Flags
+t2.value21 = t1.value18
+t2.value22 = t1.value15
+
+function t1.value17()
+	if t2.value22() or t2.value13.Busy() then
+		return
+	end
+
+	local Get = t2.value13.Get
+
+	if (tonumber(Get("Stand")) or 0) < 1 then
+		return
+	end
+
+	t2.value13.EnterTrainSpot()
+
+	local now = os.clock()
+
+	while true do
+		local v104 = not t2.value22()
+
+		if v104 then
+			v104 = os.clock() - now < 3
+		end
+
+		if not v104 then
+			return
+		end
+
+		task.wait(0.2)
+	end
+end
+function t1.value16()
+	if not t2.value22() then
+		return
+	end
+
+	pcall(t2.value13.Training.Stop)
+
+	local now = os.clock()
+
+	while true do
+		local v106 = t2.value13.Busy()
+
+		if v106 then
+			v106 = os.clock() - now < 8
+		end
+
+		if not v106 then
+			break
+		end
+
+		task.wait(0.2)
+	end
+
+	task.wait(0.5)
+end
+function t1.value19()
+	if t2.value13.Busy() then
+		return
+	end
+
+	t2.value21(t2.value20.PerfectMeter)
+	t2.value13.CrossThrowLine()
+
+	local now = os.clock()
+
+	while true do
+		local v108 = not t2.value13.Busy()
+
+		if v108 then
+			v108 = os.clock() - now < 3
+		end
+
+		if not v108 then
+			break
+		end
+
+		task.wait(0.1)
+	end
+
+	local now2 = os.clock()
+
+	while true do
+		local v110 = t2.value13.Busy() == "Throw"
+
+		if v110 then
+			v110 = os.clock() - now2 < 60
+		end
+
+		if not v110 then
+			task.wait(1.5)
+
+			return
+		end
+
+		task.wait(0.3)
+	end
+end
+
+t2.value23 = t1.value16
+t2.value24 = t1.value17
+t2.value25 = nil
+t2.value26 = t1.value19
+t2.value25 = false
+
+function t2.value27()
+	if t2.value25 then
+		return
+	end
+
+	t2.value25 = true
+	task.spawn(function()
+		local now = nil
+
+		while true do
+			local AutoThrow = t2.value20.AutoThrow or t2.value20.AutoTrain
+
+			if AutoThrow then
+				AutoThrow = t2.value13.Alive()
+			end
+
+			if not AutoThrow then
+				t2.value25 = false
+
+				return
+			end
+
+			local AutoThrow2 = t2.value20.AutoThrow
+			local AutoTrain = t2.value20.AutoTrain
+			local v115
+
+			if AutoTrain then
+				v115 = not AutoThrow2
+			else
+				v115 = AutoTrain
+			end
+
+			if v115 then
+				if not t2.value22() then
+					t2.value24()
+				end
+			elseif AutoThrow2 and AutoTrain then
+				if t2.value22() then
+					now = now or os.clock()
+
+					if os.clock() - now >= (t2.value20.TrainTime or 30) then
+						t2.value23()
+						now = nil
+
+						if t2.value20.AutoThrow then
+							t2.value26()
+						end
+					end
+				elseif not t2.value13.Busy() then
+					now = os.clock()
+					t2.value24()
+				end
+			elseif AutoThrow2 then
+				if t2.value22() then
+					t2.value23()
+				end
+
+				t2.value26()
+			end
+
+			task.wait(0.5)
+		end
+	end)
+end
+
+Main:Section("Throw")
+Main.Toggle(Main, {
+	Name = "Auto throw",
+	Description = "Throw food again and again",
+	Icon = "repeat",
+	Flag = "AutoThrow",
+	Callback = function(p18)
+		if not p18 then
+			return
+		end
+
+		t2.value27()
+	end
+})
+Main:Toggle({
+	Name = "Perfect meter",
+	Description = "Always land a PERFECT throw",
+	Icon = "target",
+	Flag = "PerfectMeter",
+	Callback = t2.value21
+})
+Main.Toggle(Main, {
+	Name = "Skip animations",
+	Description = "Shorten the flight and animal reveal scenes",
+	Icon = "rocket",
+	Flag = "SkipAnimations",
+	Callback = function(p19)
+		t2.value13.SetSkip(p19)
+	end
+})
+Main:Section("Train")
+Main.Toggle(Main, {
+	Name = "Auto train",
+	Description = "Train on the pull-up bar and tap x2 bonuses",
+	Icon = "activity",
+	Flag = "AutoTrain",
+	Callback = function(p20)
+		if p20 then
+			t2.value27()
+
+			return
+		end
+
+		if t2.value20.AutoThrow then
+			return
+		end
+
+		t2.value23()
+	end
+})
+Main:Slider({
+	Name = "Train time before throw",
+	Description = "Used when auto throw and auto train are both on",
+	Icon = "timer",
+	Min = 10,
+	Max = 300,
+	Increment = 5,
+	Default = 30,
+	Suffix = "s",
+	Flag = "TrainTime"
+})
+Main:Toggle({
+	Name = "Auto x2",
+	Description = "Tap the x2 bonus while training (also when you train yourself)",
+	Icon = "flame",
+	Flag = "AutoX2",
+	Default = true
+})
+t1.value21 = t2.value13.Remotes:FindFirstChild("Training_Bonus")
+
+if t1.value21 then
+	t1.value21.OnClientEvent:Connect(function(p21)
+		local AutoX2 = t2.value20.AutoX2
+
+		if AutoX2 then
+			AutoX2 = p21 ~= nil
+
+			if AutoX2 then
+				AutoX2 = t2.value13.Alive()
+			end
+		end
+
+		if not AutoX2 then
+			return
+		end
+
+		task.wait(0.3 + math.random() * 0.4)
+
+		local now = os.clock()
+		local TrainingSequence = nil
+
+		while true do
+			local v119 = not TrainingSequence
+
+			if v119 then
+				v119 = os.clock() - now < 2
+			end
+
+			if not v119 then
+				break
+			end
+
+			TrainingSequence = t2.value4.PlayerGui:FindFirstChild("TrainingSequence")
+
+			if TrainingSequence then
+				TrainingSequence = TrainingSequence:FindFirstChild("TapBonusLayer", true)
+			end
+
+			if TrainingSequence then
+				TrainingSequence = TrainingSequence:FindFirstChild("TapBonus")
+			end
+
+			if not TrainingSequence then
+				task.wait(0.1)
+			end
+		end
+
+		local u120 = false
+
+		if TrainingSequence then
+			local getconnections_ = getconnections
+			local v122 = type(getconnections_) == "function"
+		end
+
+		if v142 then
+			pcall(function()
+				for _, v in ipairs(getconnections(TrainingSequence.Activated)) do
+					v:Fire()
+					u120 = true
+				end
+			end)
+		end
+
+		if u120 then
+			return
+		end
+
+		t2.value13.Invoke("Training_TapBonus", p21)
+	end)
+end
+
+local value82 = t2.value8
+
+t1.value21 = value82.Tab
+t1.value21 = t1.value21(value82, "Shop", "shopping-cart", "Auto buy upgrades")
+
+function t2.value28()
+	local Foods = t2.value13.Foods
+
+	if not Foods then
+		return
+	end
+
+	local OwnedFoods = t2.value13.Get("OwnedFoods") or {}
+	local v128 = nil
+
+	for i = 1, Foods.CountAll() do
+		local v130 = Foods.GetAny(i)
+		local v131
+
+		if v130 then
+			v131 = not Foods.IsLocked(i)
+		else
+			v131 = v130
+		end
+
+		if v131 then
+			local Index = v130.Index or i
+			local v133
+
+			if OwnedFoods[Index] == true then
+				v133 = false
+			else
+				v133 = OwnedFoods[tostring(Index)] ~= true
+			end
+
+			if v133 then
+				local v134 = t2.value13.Price(v130) <= t2.value13.Money()
+
+				if v134 then
+					v134 = t2.value13.Invoke("Shop_Buy", i).Ok
+				end
+
+				if not v134 then
+					break
+				end
+
+				OwnedFoods[Index] = true
+
+				local value11 = t2.value11
+				local Name = v130.Name
+
+				value11("Bought " .. tostring(Name) .. "!", "Success")
+			end
+
+			if OwnedFoods[Index] == true and true or OwnedFoods[tostring(Index)] == true then
+				v128 = i
+			end
+		end
+	end
+
+	local v137
+
+	if v128 then
+		local Get = t2.value13.Get
+
+		v137 = tonumber(Get("EquippedFood")) ~= v128
+	else
+		v137 = v128
+	end
+
+	if not v137 then
+		return
+	end
+
+	t2.value13.Invoke("Shop_Equip", v128)
+end
+function t2.value29()
+	local Stands = t2.value13.Stands
+
+	if not Stands then
+		return
+	end
+
+	local Get = Stands.Get
+	local Get2 = t2.value13.Get
+	local v143 = Get((tonumber(Get2("Stand")) or 0) + 1)
+
+	if v143 then
+		v143 = t2.value13.Price(v143) <= t2.value13.Money()
+	end
+
+	if not (v143 and t2.value13.AtPrompt("ProximityPrompt", "UpgradeButton", "Stand_Upgrade").Ok) then
+		return
+	end
+
+	t2.value11("Upgraded pull-up bar!", "Success")
+end
+function t2.value30()
+	local Fence = t2.value13.Fence
+
+	if not Fence then
+		return
+	end
+
+	local Get = t2.value13.Get
+	local v145 = tonumber(Get("FenceLevel")) or 0
+	local v146 = Fence.Get(v145 + 1)
+
+	if v146 then
+		local Price = v146.Price
+
+		v146 = (tonumber(Price) or math.huge) <= t2.value13.Money()
+	end
+
+	if not (v146 and t2.value13.AtPrompt("UpgradePrompt", nil, "Plot_UpgradeFence").Ok) then
+		return
+	end
+
+	t2.value11("Upgraded fence!", "Success")
+end
+function t2.value31(p22, p23)
+	task.spawn(function()
+		while true do
+			local v148 = t2.value20[p22]
+
+			if v148 then
+				v148 = t2.value13.Alive()
+			end
+
+			if not v148 then
+				return
+			end
+
+			pcall(p23)
+			task.wait(t2.value20.ShopDelay or 3)
+		end
+	end)
+end
+
+t1.value21:Section("Auto Buy")
+t1.value21.Toggle(t1.value21, {
+	Name = "Auto buy best food",
+	Description = "Buy the next food when you can afford it and equip the best",
+	Icon = "apple",
+	Flag = "AutoBuyFood",
+	Callback = function(p24)
+		if not p24 then
+			return
+		end
+
+		t2.value31("AutoBuyFood", t2.value28)
+	end
+})
+t1.value21.Toggle(t1.value21, {
+	Name = "Auto buy bar",
+	Description = "Upgrade the pull-up bar when you can afford it",
+	Icon = "arrow-up-circle",
+	Flag = "AutoBuyBar",
+	Callback = function(p25)
+		if not p25 then
+			return
+		end
+
+		t2.value31("AutoBuyBar", t2.value29)
+	end
+})
+t1.value21.Toggle(t1.value21, {
+	Name = "Auto buy fence",
+	Description = "Upgrade the plot fence for more animal slots",
+	Icon = "shield",
+	Flag = "AutoBuyFence",
+	Callback = function(p26)
+		if not p26 then
+			return
+		end
+
+		t2.value31("AutoBuyFence", t2.value30)
+	end
+})
+t1.value21:Slider({
+	Name = "Check delay",
+	Icon = "timer",
+	Min = 1,
+	Max = 30,
+	Increment = 1,
+	Default = 3,
+	Suffix = "s",
+	Flag = "ShopDelay"
+})
+
+local Animals = t2.value8:Tab("Animals", "bone", "Claim, equip and sell")
+
+function t2.value32()
+	for _, v in pairs(t2.value13.Get("Animals") or {}) do
+		local v152
+
+		if type(v) == "table" then
+			v152 = v.Placed ~= true
+		else
+			v152 = false
+		end
+
+		if v152 then
+			return true
+		end
+	end
+
+	return false
+end
+function t2.value33()
+	local State = t2.value13.State
+
+	if State then
+		State = t2.value13.State.OfflineOpen
+
+		if State then
+			State = t2.value13.Offline
+
+			if State then
+				State = t2.value13.Offline.Claim
+			end
+		end
+	end
+
+	if State then
+		pcall(t2.value13.Offline.Claim)
+	end
+
+	if not (t2.value13.Get("FreeAnimalClaimed") == false and t2.value13.Invoke("Shop_ClaimFree").Ok) then
+		return
+	end
+
+	t2.value11("Claimed free animal!", "Success")
+end
+function t2.value34()
+	if not t2.value32() then
+		return
+	end
+
+	t2.value13.Invoke("Plot_EquipBest")
+end
+
+t2.value35 = {
+	Rarities = {},
+	Mutations = {}
+}
+
+local ipairs_ = ipairs
+local Rarity = t2.value13.Rarity
+
+if Rarity then
+	Rarity = t2.value13.Rarity.List
+end
+
+t1.value1 = t1.value1
+
+local v156, v157, v158 = ipairs_(Rarity or {})
+
+while true do
+	local v159
+
+	v158, v159 = v156(v157, v158)
+
+	if not v158 then
+		break
+	end
+
+	local Rarities = t2.value35.Rarities
+	local Name = v159.Name or tostring(v159)
+
+	table.insert(Rarities, Name)
+end
+
+if #t2.value35.Rarities == 0 then
+	t2.value35.Rarities = {
+		"Common",
+		"Uncommon",
+		"Rare",
+		"Epic",
+		"Legendary",
+		"Mythic"
+	}
+end
+
+local ipairs_2 = ipairs
+local Mutations = t2.value13.Mutations
+
+if Mutations then
+	Mutations = t2.value13.Mutations.List
+end
+
+t1.value1 = t1.value1
+
+for _, v in ipairs_2(Mutations or {}) do
+	local insert = table.insert
+	local Mutations2 = t2.value35.Mutations
+	local v168 = type(v) == "table"
+
+	if v168 then
+		local value14 = t1.value1
+
+		v168 = v.Name or v.Key
+		t1.value1 = value14
+	end
+
+	insert(Mutations2, v168 or tostring(v))
+end
+
+function t2.value35.RarityIndex(p27)
+	for i, rarity in ipairs(t2.value35.Rarities) do
+		if rarity == p27 then
+			return i
+		end
+	end
+
+	return 1
+end
+function t2.value35.ShouldSell(p28)
+	if type(p28) ~= "table" or (p28.Placed == true and true or p28.Bought) then
+		return false
+	end
+
+	local Economy = t2.value13.Economy
+
+	if Economy then
+		Economy = t2.value13.Economy.Get
+
+		if Economy then
+			Economy = t2.value13.Economy.Get(p28.ModelName)
+		end
+	end
+
+	local RarityIndex = t2.value35.RarityIndex
+
+	if Economy then
+		Economy = Economy.Rarity
+	end
+
+	if RarityIndex(Economy or "Common") > t2.value35.RarityIndex(t2.value20.SellMaxRarity or "Rare") then
+		return false
+	end
+
+	local SellKeepMutations = t2.value20.SellKeepMutations
+	local Mutation = p28.Mutation
+
+	if Mutation then
+		Mutation = type(SellKeepMutations) == "table"
+
+		if Mutation then
+			Mutation = SellKeepMutations[p28.Mutation] or table.find(SellKeepMutations, p28.Mutation)
+		end
+	end
+
+	if Mutation then
+		return false
+	end
+
+	local SellKeepBig = t2.value20.SellKeepBig
+
+	if not SellKeepBig then
+		return not SellKeepBig
+	end
+
+	local Size = p28.Size
+
+	SellKeepBig = (tonumber(Size) or 1) > 1
+
+	return not SellKeepBig
+end
+
+local function v178()
+	if t2.value20.SellMode == "Sell all" then
+		local Plot_SellAll = t2.value13.Invoke("Plot_SellAll")
+
+		return Plot_SellAll.Ok and (Plot_SellAll.Count or 0) or 0
+	else
+		local n1 = 0
+
+		for k, v in pairs(t2.value13.Get("Animals") or {}) do
+			if t2.value35.ShouldSell(v) then
+				if t2.value13.Invoke("Plot_SellAnimal", k).Ok then
+					n1 = n1 + 1
+				end
+
+				task.wait(0.25)
+			end
+		end
+
+		return n1
+	end
+end
+
+function t2.value36()
+	if not t2.value32() then
+		return
+	end
+
+	if t2.value20.AutoEquipBest then
+		t2.value13.Invoke("Plot_EquipBest")
+		task.wait(0.5)
+	end
+
+	local v183 = v178()
+
+	if not (v183 > 0) then
+		return
+	end
+
+	t2.value11("Sold " .. tostring(v183) .. " animals", "Success")
+end
+
+Animals:Section("Auto")
+Animals.Toggle(Animals, {
+	Name = "Auto claim",
+	Description = "Claim offline earnings and the free animal",
+	Icon = "gift",
+	Flag = "AutoClaim",
+	Callback = function(p29)
+		if not p29 then
+			return
+		end
+
+		t2.value31("AutoClaim", t2.value33)
+	end
+})
+Animals.Toggle(Animals, {
+	Name = "Auto equip best",
+	Description = "Put your best animals on the plot",
+	Icon = "star",
+	Flag = "AutoEquipBest",
+	Callback = function(p30)
+		if not p30 then
+			return
+		end
+
+		t2.value31("AutoEquipBest", t2.value34)
+	end
+})
+Animals.Toggle(Animals, {
+	Name = "Auto sell",
+	Description = "Sell backpack animals (never placed or bought ones)",
+	Icon = "coins",
+	Flag = "AutoSell",
+	Callback = function(p31)
+		if not p31 then
+			return
+		end
+
+		t2.value31("AutoSell", t2.value36)
+	end
+})
+Animals:Section("Sell Config")
+Animals:Dropdown({
+	Name = "Sell mode",
+	Description = "Filtered uses the settings below",
+	Icon = "coins",
+	Options = { "Filtered", "Sell all" },
+	Default = "Filtered",
+	Flag = "SellMode"
+})
+
+local Rarities = t2.value35.Rarities
+local Dropdown = Animals.Dropdown
+local Rarities2 = t2.value35.Rarities
+local v187 = #t2.value35.Rarities
+
+Dropdown(Animals, {
+	Name = "Sell up to rarity",
+	Description = "Rarer animals are kept",
+	Icon = "star",
+	Options = Rarities,
+	Default = Rarities2[math.min(3, v187)],
+	Flag = "SellMaxRarity"
+})
+
+local t5 = {
+	Name = "Keep mutations",
+	Description = "Animals with these mutations are never sold",
+	Icon = "shield",
+	Options = t2.value35.Mutations,
+	Default = t2.value35.Mutations,
+	Multi = true,
+	Flag = "SellKeepMutations"
+}
+
+Animals.Dropdown(Animals, t5)
+Animals:Toggle({
+	Name = "Keep big animals",
+	Description = "Never sell animals bigger than normal size",
+	Icon = "arrow-up-circle",
+	Flag = "SellKeepBig",
+	Default = true
+})
+Animals:Section("Once")
+Animals.Button(Animals, {
+	Name = "Equip best now",
+	ButtonText = "Run",
+	Callback = function()
+		local Plot_EquipBest = t2.value13.Invoke("Plot_EquipBest")
+		local value11 = t2.value11
+		local v191 = Plot_EquipBest.Ok and "Equipped best animals."
+
+		if v191 then
+			value11(v191, Plot_EquipBest.Ok and "Success" or "Warning")
+
+			return
+		end
+
+		local Reason = Plot_EquipBest.Reason
+
+		v191 = "Failed: " .. tostring(Reason)
+		value11(v191, Plot_EquipBest.Ok and "Success" or "Warning")
+	end
+})
+Animals.Button(Animals, {
+	Name = "Sell now",
+	Description = "Uses the sell config",
+	ButtonText = "Sell",
+	Callback = function()
+		local value11 = t2.value11
+		local v194 = v178()
+
+		value11("Sold " .. tostring(v194) .. " animals", "Success")
+	end
+})
+
+local Player = t2.value8:Tab("Player", "user", "Movement")
+
+Player.Section(Player, "Movement")
+t2.value37 = 16
+t2.value38 = nil
+t2.value38 = 50
+
+function t2.value39()
+	local v196 = t2.value9()
+
+	if not v196 then
+		return
+	end
+
+	v196.WalkSpeed = t2.value37
+	v196.UseJumpPower = true
+	v196.JumpPower = t2.value38
+end
+
+Player.Slider(Player, {
+	Name = "Walk speed",
+	Icon = "gauge",
+	Min = 16,
+	Max = 200,
+	Default = 16,
+	Flag = "WalkSpeed",
+	Callback = function(p32)
+		t2.value37 = p32
+		t2.value39()
+	end
+})
+Player.Slider(Player, {
+	Name = "Jump power",
+	Icon = "arrow-up",
+	Min = 50,
+	Max = 300,
+	Default = 50,
+	Flag = "JumpPower",
+	Callback = function(p33)
+		t2.value38 = p33
+		t2.value39()
+	end
+})
+t2.value4.CharacterAdded:Connect(function(character)
+	character:WaitForChild("Humanoid", 5)
+	t2.value39()
+end)
+t2.value40 = false
+Player.Toggle(Player, {
+	Name = "Infinite jump",
+	Icon = "chevrons-up",
+	Flag = "InfiniteJump",
+	Callback = function(p34)
+		t2.value40 = p34
+	end
+})
+t1.value4.JumpRequest:Connect(function()
+	local v197 = t2.value9()
+
+	if not (t2.value40 and v197) then
+		return
+	end
+
+	v197:ChangeState(Enum.HumanoidStateType.Jumping)
+end)
+t2.value41 = nil
+Player.Toggle(Player, {
+	Name = "Noclip",
+	Icon = "ghost",
+	Flag = "Noclip",
+	Callback = function(p35)
+		if t2.value41 then
+			t2.value41:Disconnect()
+		end
+
+		if not p35 then
+			return
+		end
+
+		t2.value1.Stepped:Connect(function()
+			local Character = t2.value4.Character
+
+			if Character then
+				local GetDescendants = Character.GetDescendants
+
+				for _, v in ipairs(GetDescendants(Character)) do
+					if v:IsA("BasePart") then
+						v.CanCollide = false
+					end
+				end
+			end
+		end)
+	end
+})
+
+local Teleport = t2.value8:Tab("Teleport", "map-pin", "Places and servers")
+
+function t2.value42(p36)
+	if p36 == "Throw area" then
+		local StarterArea = workspace:FindFirstChild("StarterArea")
+
+		if not StarterArea then
+			return StarterArea
+		end
+
+		StarterArea = CFrame.new(StarterArea.Position + Vector3.new(0, 4, 8))
+
+		return StarterArea
+	else
+		if p36 ~= "My plot" then
+			return
+		end
+
+		local Plots = workspace:FindFirstChild("Plots")
+
+		if Plots then
+			local tostring_ = tostring
+			local value4 = t2.value4
+			local GetAttribute = value4.GetAttribute
+
+			Plots = Plots.FindFirstChild(Plots, tostring_(GetAttribute(value4, "PlotIndex")))
+		end
+
+		if not Plots then
+			return Plots
+		end
+
+		Plots = CFrame.new(Plots.Position + Vector3.new(0, 5, 0))
+
+		return Plots
+	end
+end
+
+Teleport:Section("Places")
+t2.value43 = Teleport:Dropdown({
+	Name = "Place",
+	Icon = "map",
+	Options = { "My plot", "Throw area" },
+	Default = "My plot"
+})
+Teleport.Button(Teleport, {
+	Name = "Teleport to place",
+	ButtonText = "Go",
+	Style = "Primary",
+	Callback = function()
+		local v208 = t2.value10()
+		local v209 = t2.value42(t2.value43.Value)
+		local v210
+
+		if v208 then
+			if v209 then
+				v210 = not t2.value13.Busy()
+			else
+				v210 = v209
+			end
+		else
+			v210 = v208
+		end
+
+		if not v210 then
+			return
+		end
+
+		v208.CFrame = v209
+	end
+})
+Teleport:Section("Server")
+Teleport.Button(Teleport, {
+	Name = "Rejoin",
+	Description = "Join this server again",
+	Icon = "refresh-cw",
+	ButtonText = "Rejoin",
+	Callback = function()
+		t2.value2:TeleportToPlaceInstance(game.PlaceId, game.JobId, t2.value4)
+	end
+})
+
+local Misc = t2.value8:Tab("Misc", "layers", "Other tools")
+
+Misc:Section("Utility")
+t2.value44 = nil
+Misc.Toggle(Misc, {
+	Name = "Anti AFK",
+	Description = "Stop the 20 minute idle kick",
+	Icon = "coffee",
+	Flag = "AntiAFK",
+	Callback = function(p37)
+		if t2.value44 then
+			t2.value44:Disconnect()
+		end
+
+		if not p37 then
+			return
+		end
+
+		t2.value4.Idled:Connect(function()
+			t2.value3:CaptureController()
+			t2.value3:ClickButton2(Vector2.new())
+		end)
+	end
+}):Set(true)
+t2.value8:SelectTab(t1.value13)
+t2.value11("Loaded for " .. t1.value10 .. "!", "Success")
