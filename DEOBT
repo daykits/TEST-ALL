@@ -4792,7 +4792,7 @@ t1.value123.ForceCheckbox = false
 t1.value123.ShowToggleFrameInKeybinds = true
 
 local v588 = t1.value123:CreateWindow({
-	Title = "HybridE3",
+	Title = "ember hub",
 	Footer = "v" .. t1.value31.Version .. " | discord.gg/J2PM9X9x7z",
 	Icon = 78282255576376,
 	NotifySide = "Right",
