@@ -1,1 +1,1232 @@
+-- discord.gg/syncrypt
 
+local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Zaminhh/TDT-UI/main/TDTLib.lua"))()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local RemoteEvent = ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild("Packet"):WaitForChild("RemoteEvent")
+
+_G.name_game = "gag2"
+_G.Setting = {
+	walkspeed = { false },
+	jumpower = { false },
+	infjump = { false },
+	jump_value = { 35 },
+	speed_value = { 100 },
+	esppet = { false },
+	espseed = { false },
+	harvest = { false },
+	sell = { false },
+	buyseed = { false },
+	buygear = { false },
+	buycrate = { false },
+	buypet = { false },
+	hoppet = { false },
+	takeseed = { false },
+	fixlag = { false },
+	plant = { false },
+	home = { false },
+	rejoin = { false },
+	minute = { 20 },
+	plantseed = {
+		Carrot = false,
+		Strawberry = false,
+		Blueberry = false,
+		Tulip = false,
+		Tomato = false,
+		Apple = false,
+		Bamboo = true,
+		Corn = false,
+		Cactus = false,
+		Pineapple = false,
+		Mushroom = true,
+		["Green Bean"] = false,
+		Banana = true,
+		Grape = true,
+		Coconut = true,
+		Mango = true,
+		["Dragon Fruit"] = true,
+		Acorn = true,
+		Cherry = true,
+		Sunflower = true,
+		["Venus Fly Trap"] = true,
+		Pomegranate = true,
+		["Poison Apple"] = true,
+		["Venom Spitter"] = true,
+		["Moon Bloom"] = true,
+		["Hypno Bloom"] = true,
+		["Dragon's Breath"] = true,
+		["Fire Fern"] = true,
+		["Sun Bloom"] = true,
+		["Star Fruit"] = true
+	},
+	seed = {
+		Carrot = true,
+		Strawberry = true,
+		Blueberry = true,
+		Tulip = true,
+		Tomato = true,
+		Apple = true,
+		Bamboo = true,
+		Corn = true,
+		Cactus = true,
+		Pineapple = true,
+		Mushroom = true,
+		["Green Bean"] = false,
+		Banana = true,
+		Grape = true,
+		Coconut = true,
+		Mango = true,
+		["Dragon Fruit"] = true,
+		Acorn = true,
+		Cherry = true,
+		Sunflower = true,
+		["Venus Fly Trap"] = true,
+		Pomegranate = true,
+		["Poison Apple"] = true,
+		["Venom Spitter"] = true,
+		["Moon Bloom"] = true,
+		["Hypno Bloom"] = true,
+		["Dragon's Breath"] = true
+	},
+	gear = {
+		["Common Watering Can"] = true,
+		["Common Sprinkler"] = true,
+		["Uncommon Sprinkler"] = true,
+		Trowel = true,
+		["Rare Sprinkler"] = true,
+		["Jump Mushroom"] = true,
+		["Speed Mushroom"] = true,
+		["Shrink Mushroom"] = true,
+		["Supersize Mushroom"] = true,
+		Gnome = true,
+		["Basic Pot"] = true,
+		Flashbang = true,
+		["Invisibility Mushroom"] = true,
+		["Legendary Sprinkler"] = true,
+		["Super Watering Can"] = true,
+		["Super Sprinkler"] = true
+	},
+	crate = {
+		["Ladder Crate"] = true,
+		["Bench Crate"] = true,
+		["Light Crate"] = true,
+		["Sign Crate"] = true,
+		["Arch Crate"] = true,
+		["Roleplay Crate"] = true,
+		["Picture Frame Crate"] = true,
+		["Bridge Crate"] = true,
+		["Spring Crate"] = true,
+		["Seesaw Crate"] = true,
+		["Conveyor Crate"] = true,
+		["Owner Door Crate"] = true,
+		["Bear Trap Crate"] = true,
+		["Fence Crate"] = true,
+		["Teleporter Pad Crate"] = true
+	},
+	pet = {
+		Frog = false,
+		Bunny = false,
+		Owl = false,
+		Deer = false,
+		Turtle = false,
+		Robin = false,
+		Bee = false,
+		Butterfly = false,
+		Monkey = true,
+		["Black Dragon"] = true,
+		["Golden Dragonfly"] = true,
+		Unicorn = true,
+		Bear = true,
+		Raccoon = true,
+		["Bald Eagle"] = true,
+		Firefly = true
+	}
+}
+
+local t1 = {
+	"Carrot",
+	"Strawberry",
+	"Blueberry",
+	"Tulip",
+	"Tomato",
+	"Apple",
+	"Bamboo",
+	"Corn",
+	"Cactus",
+	"Pineapple",
+	"Mushroom",
+	"Green Bean",
+	"Banana",
+	"Grape",
+	"Coconut",
+	"Mango",
+	"Dragon Fruit",
+	"Acorn",
+	"Cherry",
+	"Fire Fern",
+	"Sunflower",
+	"Venus Fly Trap",
+	"Pomegranate",
+	"Poison Apple",
+	"Venom Spitter",
+	"Moon Bloom",
+	"Hypno Bloom",
+	"Sun Bloom",
+	"Dragon's Breath",
+	"Star Fruit"
+}
+local t2 = {
+	"Common Watering Can",
+	"Common Sprinkler",
+	"Uncommon Sprinkler",
+	"Trowel",
+	"Rare Sprinkler",
+	"Jump Mushroom",
+	"Speed Mushroom",
+	"Shrink Mushroom",
+	"Supersize Mushroom",
+	"Gnome",
+	"Basic Pot",
+	"Flashbang",
+	"Invisibility Mushroom",
+	"Legendary Sprinkler",
+	"Super Watering Can",
+	"Super Sprinkler"
+}
+local t3 = {
+	"Ladder Crate",
+	"Bench Crate",
+	"Light Crate",
+	"Sign Crate",
+	"Arch Crate",
+	"Roleplay Crate",
+	"Picture Frame Crate",
+	"Bridge Crate",
+	"Spring Crate",
+	"Seesaw Crate",
+	"Conveyor Crate",
+	"Owner Door Crate",
+	"Bear Trap Crate",
+	"Fence Crate",
+	"Teleporter Pad Crate"
+}
+local t4 = {
+	"Frog",
+	"Bunny",
+	"Owl",
+	"Deer",
+	"Turtle",
+	"Robin",
+	"Bee",
+	"Butterfly",
+	"Monkey",
+	"Black Dragon",
+	"Golden Dragonfly",
+	"Unicorn",
+	"Bear",
+	"Raccoon",
+	"Bald Eagle",
+	"Firefly"
+}
+
+GetSetting = function(p1)
+	if p1 == "fake" then
+		return false
+	end
+
+	local v16 = _G.Setting[p1]
+
+	if v16 then
+		return v16[1]
+	end
+
+	return false
+end
+SetSetting = function(p2, p3)
+	_G.Setting[p2][1] = p3
+	SaveSettings()
+end
+LoadSettings = function()
+	if readfile and writefile and isfile and isfolder then
+		if not isfolder("TDT Hub GAG2") then
+			makefolder("TDT Hub GAG2")
+		end
+
+		if not isfolder("TDT Hub GAG2/Save Script") then
+			makefolder("TDT Hub GAG2/Save Script")
+		end
+
+		local v17 = "TDT Hub GAG2/Save Script/" .. _G.name_game .. ".json"
+
+		if not isfile(v17) or readfile(v17) == "" then
+			writefile(v17, HttpService:JSONEncode(_G.Setting))
+		else
+			local ok, result = pcall(function()
+				return HttpService:JSONDecode(readfile(v17))
+			end)
+
+			if ok then
+				for k, v in pairs(result) do
+					_G.Setting[k] = v
+				end
+			else
+				writefile(v17, HttpService:JSONEncode(_G.Setting))
+			end
+		end
+	end
+end
+SaveSettings = function()
+	if readfile and writefile and isfile and isfolder then
+		local v22 = "TDT Hub GAG2/Save Script/" .. _G.name_game .. ".json"
+
+		if isfile(v22) then
+			local t5 = {}
+
+			for k, v in pairs(_G.Setting) do
+				t5[k] = v
+			end
+
+			writefile(v22, HttpService:JSONEncode(t5))
+		else
+			LoadSettings()
+		end
+	end
+end
+LoadSettings()
+
+local function v26(p4)
+	local attribute = RemoteEvent:GetAttribute(p4)
+
+	if not attribute then
+		error("Packet not found: " .. p4)
+	end
+
+	return attribute
+end
+local function v28(p5, p6)
+	local v29 = buffer.create(3)
+
+	buffer.writeu16(v29, 0, v26(p5))
+	buffer.writeu8(v29, 2, p6)
+	RemoteEvent:FireServer(v29)
+end
+local function v30(p7, p8)
+	local v31 = buffer.create(3 + #p8)
+
+	buffer.writeu16(v31, 0, v26(p7))
+	buffer.writeu8(v31, 2, #p8)
+	buffer.writestring(v31, 3, p8)
+	RemoteEvent:FireServer(v31)
+end
+local function v32(p9, p10, p11)
+	local v33 = buffer.create(4 + #p10 + #p11)
+
+	buffer.writeu16(v33, 0, v26(p9))
+	buffer.writeu8(v33, 2, #p10)
+	buffer.writestring(v33, 3, p10)
+
+	local v34 = 3 + #p10
+
+	buffer.writeu8(v33, v34, #p11)
+	buffer.writestring(v33, v34 + 1, p11)
+	RemoteEvent:FireServer(v33)
+end
+local function v35(p12, p13)
+	local v36 = buffer.create(2)
+
+	buffer.writeu16(v36, 0, v26(p12))
+	RemoteEvent:FireServer(v36, { p13 })
+end
+local function v37(p14)
+	v28("SellAll", p14)
+end
+local function v38(p15)
+	v30("PurchaseSeed", p15)
+end
+local function v39(p16)
+	v30("PurchaseGear", p16)
+end
+local function v40(p17)
+	v30("PurchaseCrate", p17)
+end
+local function v41(p18)
+	v30("TeleportButtonRequest", p18)
+end
+local function v42(p19, p20)
+	v32("CollectFruit", p19, p20)
+end
+local function v43(p21)
+	local v44
+
+	if typeof(p21) == "string" then
+		v44 = workspace.Map.WildPetRef:FindFirstChild(p21)
+	else
+		v44 = p21
+	end
+
+	if not v44 then
+		warn("Wild pet not found")
+
+		return
+	end
+
+	v35("WildPetTame", v44)
+end
+local function v45(p22)
+	if typeof(p22) == "Instance" then
+		p22 = p22.Name
+	end
+
+	return p22:match(".*_(WildPet_.+)") or p22
+end
+local function v46()
+	for _, child in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+		if string.find(child.Name, "Plot") then
+			local Title = child:FindFirstChild("PlayerFrame") and child.PlayerFrame:FindFirstChild("Title")
+
+			if Title then
+				Title = string.find(Title.Text, "Your Garden") or Title.Text == "Your Garden"
+			end
+
+			if Title then
+				return child.Name
+			end
+		end
+	end
+end
+local function v50()
+	local v51 = v46()
+
+	if not v51 then
+		return
+	end
+
+	local v52 = workspace.Gardens:FindFirstChild(v51)
+
+	if not v52 then
+		return
+	end
+
+	local Plants = v52:FindFirstChild("Plants")
+
+	if not Plants then
+		return
+	end
+
+	for _, child in pairs(Plants:GetChildren()) do
+		local attribute = child:GetAttribute("PlantId")
+
+		if attribute then
+			local Fruits = child:FindFirstChild("Fruits")
+
+			if Fruits and #Fruits:GetChildren() > 0 then
+				for _, child2 in pairs(Fruits:GetChildren()) do
+					local attribute2 = child2:GetAttribute("FruitId")
+
+					if attribute2 then
+						v42(attribute, attribute2)
+						task.wait(0.03)
+					end
+				end
+			else
+				v42(attribute, "")
+				task.wait(0.03)
+			end
+		end
+	end
+end
+local function v61(p23)
+	local HumanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+	if not HumanoidRootPart then
+		return 0
+	end
+
+	if typeof(p23) == "vector" then
+		return (p23 - HumanoidRootPart.Position).Magnitude
+	end
+
+	return (p23.Position - HumanoidRootPart.Position).Magnitude
+end
+local function v63(p24)
+	for _, v in pairs(p24) do
+		for _, child in pairs(workspace.Map.WildPetSpawns:GetChildren()) do
+			if string.find(child.Name, v) then
+				return {
+					child,
+					child.RootPart.CFrame
+				}
+			end
+		end
+	end
+end
+local function v68(p25, p26)
+	local t6 = {}
+
+	for k, v in pairs(p25) do
+		if p26 == 1 then
+			if v then
+				table.insert(t6, k)
+			end
+		elseif p26 == 2 then
+			table.insert(t6, k)
+		end
+	end
+
+	return t6
+end
+local function v72(p27, p28)
+	local PlayerGui = LocalPlayer.PlayerGui
+
+	if p27 == 1 and PlayerGui.SeedShop.Frame.NormalShop[p28].Main_Frame.Stock_Text.Text ~= "x0 in Stock" then
+		return true
+	end
+
+	if p27 == 2 and PlayerGui.GearShop.Frame.ScrollingFrame[p28].Main_Frame.Stock_Text.Text ~= "x0 in Stock" then
+		return true
+	end
+
+	if p27 == 3 and PlayerGui.CrateShop.Frame.ScrollingFrame[p28].Main_Frame.Stock_Text.Text ~= "x0 in Stock" then
+		return true
+	end
+end
+local function v74()
+	for _, child in pairs(workspace.Map.SeedPackSpawnServerLocations:GetChildren()) do
+		if child:FindFirstChild("ProximityPrompt") then
+			return {
+				child.CFrame,
+				child:FindFirstChild("ProximityPrompt")
+			}
+		end
+	end
+end
+local function v77()
+	local v78 = v46()
+
+	if not v78 then
+		return Vector3.new(0, 10, 0)
+	end
+
+	local Move = workspace.Gardens[v78].Visual.Move
+	local Size = Move.Size
+	local Position = (Move.CFrame * CFrame.new((math.random() - 0.5) * Size.X, 0, (math.random() - 0.5) * Size.Z)).Position
+
+	return Vector3.new(Position.X, Move.Position.Y, Position.Z)
+end
+local function v82()
+	local v83 = v46()
+
+	if not v83 then
+		return
+	end
+
+	for _, child in pairs(workspace.Gardens:GetChildren()) do
+		if child.Name ~= v83 then
+			child:Destroy()
+		end
+	end
+end
+local function v86(p29, p30, p31)
+	local PlantSeed = v26("PlantSeed")
+	local v88 = buffer.create(15 + #p30)
+
+	buffer.writeu16(v88, 0, PlantSeed)
+	buffer.writef32(v88, 2, p29.X)
+	buffer.writef32(v88, 6, p29.Y)
+	buffer.writef32(v88, 10, p29.Z)
+	buffer.writeu8(v88, 14, #p30)
+	buffer.writestring(v88, 15, p30)
+	RemoteEvent:FireServer(v88, { p31 })
+end
+local function v89()
+	local v90 = v68(_G.Setting.plantseed, 1)
+
+	for _, v in pairs(v90) do
+		local v93 = LocalPlayer.Backpack:FindFirstChild(v)
+
+		if v93 then
+			v86(v77(), v, v93)
+		end
+	end
+end
+local function v94()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/NTTTTTTTT/Main/main/Svv"))()
+end
+local function v95(p32)
+	local p_ntt = workspace:FindFirstChild("p_ntt")
+
+	if not p_ntt then
+		return
+	end
+
+	local HumanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+	if not HumanoidRootPart then
+		return
+	end
+
+	if (p_ntt.Position - HumanoidRootPart.Position).Magnitude >= 201 then
+		TweenService:Create(p_ntt, TweenInfo.new(0), {
+			CFrame = HumanoidRootPart.CFrame
+		}):Play()
+	else
+		TweenService:Create(p_ntt, TweenInfo.new((p32.Position - HumanoidRootPart.Position).Magnitude / 16), {
+			CFrame = p32
+		}):Play()
+		LocalPlayer.Character.HumanoidRootPart.CFrame = p_ntt.CFrame
+	end
+end
+
+if not workspace:FindFirstChild("p_ntt") then
+	local Part = Instance.new("Part")
+
+	Part.Name = "p_ntt"
+	Part.Parent = workspace
+	Part.Size = Vector3.new(5, 5, 5)
+	Part.Position = Vector3.new(0, 10, 0)
+	Part.Anchored = true
+	Part.CanCollide = false
+	Part.Transparency = 1
+end
+
+local v99 = lib:CreateWindow({
+	Title = "TDT Hub",
+	Subtitle = "Grow a Garden 2",
+	Keybind = Enum.KeyCode.LeftControl,
+	Width = 550,
+	Height = 390,
+	Home = {
+		Title = "TDT Hub",
+		Subtitle = "Grow a Garden 2",
+		Discord = "https://discord.gg/tdt",
+		Web = "https://thinhtctrackstat.com/login.php",
+		Version = "TDT Hub GAG2 v1.0"
+	}
+})
+local Main = v99:AddTab("Main")
+local Automation = Main:AddSection("Automation")
+
+Automation:AddToggle({
+	Title = "Auto Teleport Home",
+	Flag = "Home",
+	Default = GetSetting("home"),
+	Callback = function(p33)
+		SetSetting("home", p33)
+	end
+})
+Automation:AddToggle({
+	Title = "Auto Plant",
+	Flag = "Plant",
+	Default = GetSetting("plant"),
+	Callback = function(p34)
+		SetSetting("plant", p34)
+	end
+})
+Automation:AddToggle({
+	Title = "Auto Harvest Fruit",
+	Flag = "Harvest",
+	Default = GetSetting("harvest"),
+	Callback = function(p35)
+		SetSetting("harvest", p35)
+	end
+})
+Automation:AddToggle({
+	Title = "Auto Sell All Fruit",
+	Flag = "Sell",
+	Default = GetSetting("sell"),
+	Callback = function(p36)
+		SetSetting("sell", p36)
+	end
+})
+
+local v102 = Main:AddSection("Seed Plant Selection")
+
+for _, v in pairs(t1) do
+	v102:AddToggle({
+		Title = v,
+		Flag = "PlantSeed_" .. v,
+		Default = _G.Setting.plantseed[v],
+		Callback = function(p37)
+			_G.Setting.plantseed[v] = p37
+			SaveSettings()
+		end
+	})
+end
+
+local Shop = v99:AddTab("Shop")
+
+Shop:AddSection("Seed Shop"):AddToggle({
+	Title = "Auto Buy Seed",
+	Flag = "BuySeed",
+	Default = GetSetting("buyseed"),
+	Callback = function(p38)
+		SetSetting("buyseed", p38)
+	end
+})
+
+local v106 = Shop:AddSection("Seed Shop Selection")
+
+for _, v in pairs(t1) do
+	v106:AddToggle({
+		Title = v,
+		Flag = "Seed_" .. v,
+		Default = _G.Setting.seed[v],
+		Callback = function(p39)
+			_G.Setting.seed[v] = p39
+			SaveSettings()
+		end
+	})
+end
+
+Shop:AddSection("Gear Shop"):AddToggle({
+	Title = "Auto Buy Gear",
+	Flag = "BuyGear",
+	Default = GetSetting("buygear"),
+	Callback = function(p40)
+		SetSetting("buygear", p40)
+	end
+})
+
+local v109 = Shop:AddSection("Gear Shop Selection")
+
+for _, v in pairs(t2) do
+	v109:AddToggle({
+		Title = v,
+		Flag = "Gear_" .. v,
+		Default = _G.Setting.gear[v],
+		Callback = function(p41)
+			_G.Setting.gear[v] = p41
+			SaveSettings()
+		end
+	})
+end
+
+Shop:AddSection("Crate Shop"):AddToggle({
+	Title = "Auto Buy Crate",
+	Flag = "BuyCrate",
+	Default = GetSetting("buycrate"),
+	Callback = function(p42)
+		SetSetting("buycrate", p42)
+	end
+})
+
+local v112 = Shop:AddSection("Crate Shop Selection")
+
+for _, v in pairs(t3) do
+	v112:AddToggle({
+		Title = v,
+		Flag = "Crate_" .. v,
+		Default = _G.Setting.crate[v],
+		Callback = function(p43)
+			_G.Setting.crate[v] = p43
+			SaveSettings()
+		end
+	})
+end
+
+local Pet = v99:AddTab("Pet")
+local Pet2 = Pet:AddSection("Pet")
+
+Pet2:AddToggle({
+	Title = "Auto Buy Pet",
+	Flag = "BuyPet",
+	Default = GetSetting("buypet"),
+	Callback = function(p44)
+		SetSetting("buypet", p44)
+	end
+})
+Pet2:AddToggle({
+	Title = "Hop Pet (Server Hop)",
+	Flag = "HopPet",
+	Default = GetSetting("hoppet"),
+	Callback = function(p45)
+		SetSetting("hoppet", p45)
+	end
+})
+
+local v117 = Pet:AddSection("Pet Selection")
+
+for _, v in pairs(t4) do
+	v117:AddToggle({
+		Title = v,
+		Flag = "Pet_" .. v,
+		Default = _G.Setting.pet[v],
+		Callback = function(p46)
+			_G.Setting.pet[v] = p46
+			SaveSettings()
+		end
+	})
+end
+
+Pet:AddSection("Seed"):AddToggle({
+	Title = "Auto Take Seed Gold/Rainbow",
+	Flag = "TakeSeed",
+	Default = GetSetting("takeseed"),
+	Callback = function(p47)
+		SetSetting("takeseed", p47)
+	end
+})
+
+local esp = v99:AddTab("ESP"):AddSection("ESP")
+
+esp:AddToggle({
+	Title = "ESP Pet",
+	Flag = "EspPet",
+	Default = GetSetting("esppet"),
+	Callback = function(p48)
+		SetSetting("esppet", p48)
+	end
+})
+esp:AddToggle({
+	Title = "ESP Seed",
+	Flag = "EspSeed",
+	Default = GetSetting("espseed"),
+	Callback = function(p49)
+		SetSetting("espseed", p49)
+	end
+})
+
+local Movement = v99:AddTab("Player"):AddSection("Movement")
+
+Movement:AddToggle({
+	Title = "Walk Speed",
+	Flag = "WalkSpeed",
+	Default = GetSetting("walkspeed"),
+	Callback = function(p50)
+		SetSetting("walkspeed", p50)
+	end
+})
+Movement:AddSlider({
+	Title = "Speed Value",
+	Flag = "SpeedValue",
+	Min = 30,
+	Max = 500,
+	Default = GetSetting("speed_value"),
+	Callback = function(p51)
+		SetSetting("speed_value", p51)
+	end
+})
+Movement:AddToggle({
+	Title = "Jump Power",
+	Flag = "JumpPower",
+	Default = GetSetting("jumpower"),
+	Callback = function(p52)
+		SetSetting("jumpower", p52)
+	end
+})
+Movement:AddSlider({
+	Title = "Jump Value",
+	Flag = "JumpValue",
+	Min = 30,
+	Max = 500,
+	Default = GetSetting("jump_value"),
+	Callback = function(p53)
+		SetSetting("jump_value", p53)
+	end
+})
+Movement:AddToggle({
+	Title = "Inf Jump",
+	Flag = "InfJump",
+	Default = GetSetting("infjump"),
+	Callback = function(p54)
+		SetSetting("infjump", p54)
+	end
+})
+
+local Server = v99:AddTab("Server"):AddSection("Server")
+
+Server:AddButton({
+	Title = "Rejoin Server",
+	Primary = true,
+	Callback = function()
+		TeleportService:Teleport(game.PlaceId)
+	end
+})
+Server:AddButton({
+	Title = "Server Hop",
+	Primary = false,
+	Callback = function()
+		v94()
+	end
+})
+
+local Settings = v99:AddTab("Settings"):AddSection("Settings")
+
+Settings:AddToggle({
+	Title = "Fix Lag (Remove Other Gardens)",
+	Flag = "FixLag",
+	Default = GetSetting("fixlag"),
+	Callback = function(p55)
+		SetSetting("fixlag", p55)
+	end
+})
+Settings:AddToggle({
+	Title = "Auto Rejoin",
+	Flag = "AutoRejoin",
+	Default = GetSetting("rejoin"),
+	Callback = function(p56)
+		SetSetting("rejoin", p56)
+	end
+})
+Settings:AddSlider({
+	Title = "Rejoin Time (Minutes)",
+	Flag = "RejoinTime",
+	Min = 10,
+	Max = 60,
+	Default = GetSetting("minute"),
+	Callback = function(p57)
+		SetSetting("minute", p57)
+	end
+})
+task.spawn(function()
+	while task.wait(2) do
+		pcall(function()
+			if GetSetting("home") then
+				if GetSetting("takeseed") and v74() or GetSetting("buypet") and v63(v68(_G.Setting.pet, 1)) then
+					return
+				end
+
+				v41("Garden")
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.1) do
+		pcall(function()
+			if GetSetting("plant") then
+				v89()
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.1) do
+		pcall(function()
+			if GetSetting("harvest") then
+				v50()
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.2) do
+		pcall(function()
+			if GetSetting("sell") then
+				v37(86)
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.1) do
+		pcall(function()
+			if GetSetting("buyseed") then
+				local v124 = v68(_G.Setting.seed, 1)
+
+				for _, v in pairs(v124) do
+					if v72(1, v) then
+						v38(v)
+					end
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.1) do
+		pcall(function()
+			if GetSetting("buygear") then
+				local v127 = v68(_G.Setting.gear, 1)
+
+				for _, v in pairs(v127) do
+					if v72(2, v) then
+						v39(v)
+					end
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.1) do
+		pcall(function()
+			if GetSetting("buycrate") then
+				local v130 = v68(_G.Setting.crate, 1)
+
+				for _, v in pairs(v130) do
+					if v72(3, v) then
+						v40(v)
+					end
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait() do
+		pcall(function()
+			if GetSetting("buypet") then
+				local v133 = v63(v68(_G.Setting.pet, 1))
+
+				if v133 then
+					v95(v133[2] * CFrame.new(0, 2, 0))
+					v43(v45(v133[1]))
+				elseif GetSetting("hoppet") then
+					v94()
+					task.wait(10)
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait() do
+		pcall(function()
+			if GetSetting("takeseed") then
+				if GetSetting("buypet") and v63(v68(_G.Setting.pet, 1)) then
+					return
+				end
+
+				local v134 = v74()
+
+				if v134 then
+					v95(v134[1])
+
+					if v61(v134[1]) < 10 then
+						VirtualInputManager:SendKeyEvent(true, "E", false, game)
+						VirtualInputManager:SendKeyEvent(false, "E", false, game)
+					end
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(1) do
+		pcall(function()
+			if GetSetting("fixlag") then
+				v82()
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait() do
+		pcall(function()
+			if GetSetting("rejoin") then
+				task.wait(GetSetting("minute") * 60)
+
+				if not GetSetting("rejoin") then
+					return
+				end
+
+				TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.2) do
+		pcall(function()
+			local WildPetSpawns = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("WildPetSpawns")
+
+			if not WildPetSpawns then
+				return
+			end
+
+			local HumanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+			local function v137(p58)
+				if p58:IsA("BasePart") then
+					return p58
+				end
+
+				if p58:IsA("Model") then
+					return p58.PrimaryPart or p58:FindFirstChild("HumanoidRootPart") or p58:FindFirstChild("Head") or p58:FindFirstChildWhichIsA("BasePart", true)
+				end
+
+				return p58:FindFirstChildWhichIsA("BasePart", true)
+			end
+			local function v138(p59)
+				local match = tostring(p59):match("^WildPet_(.-)_WildPet_")
+
+				if match then
+					return match:gsub("_", " ")
+				end
+
+				return tostring(p59)
+			end
+
+			if GetSetting("esppet") then
+				for _, child in pairs(WildPetSpawns:GetChildren()) do
+					local v142 = v137(child)
+
+					if v142 then
+						if not v142:FindFirstChild("WildPetESP") then
+							local BillboardGui = Instance.new("BillboardGui")
+
+							BillboardGui.Name = "WildPetESP"
+							BillboardGui.Parent = v142
+							BillboardGui.Adornee = v142
+							BillboardGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+							BillboardGui.Active = true
+							BillboardGui.AlwaysOnTop = true
+							BillboardGui.LightInfluence = 1
+							BillboardGui.Size = UDim2.new(0, 200, 0, 50)
+							BillboardGui.StudsOffset = Vector3.new(0, 2.5, 0)
+
+							local TextLabel = Instance.new("TextLabel")
+
+							TextLabel.Name = "TextLabel"
+							TextLabel.Parent = BillboardGui
+							TextLabel.BackgroundTransparency = 1
+							TextLabel.Size = UDim2.new(1, 0, 1, 0)
+							TextLabel.Font = Enum.Font.GothamBold
+							TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+							TextLabel.TextSize = 14
+							TextLabel.TextStrokeTransparency = 0
+							TextLabel.TextWrapped = true
+						end
+
+						local n1 = 0
+
+						if HumanoidRootPart then
+							n1 = math.floor((HumanoidRootPart.Position - v142.Position).Magnitude)
+						end
+
+						v142.WildPetESP.TextLabel.Text = v138(child.Name) .. " | " .. n1 .. " M"
+					end
+				end
+			else
+				for _, child in pairs(WildPetSpawns:GetChildren()) do
+					local v148 = v137(child)
+
+					if v148 and v148:FindFirstChild("WildPetESP") then
+						v148.WildPetESP:Destroy()
+					end
+				end
+			end
+		end)
+	end
+end)
+task.spawn(function()
+	while task.wait(0.2) do
+		pcall(function()
+			local Map = workspace:FindFirstChild("Map")
+
+			Map = Map and Map:FindFirstChild("SeedPackSpawnServerLocations")
+
+			if not Map then
+				return
+			end
+
+			local HumanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+			local function v151(p60)
+				if p60:IsA("BasePart") then
+					return p60
+				end
+
+				if p60:IsA("Model") then
+					return p60.PrimaryPart or p60:FindFirstChild("HumanoidRootPart") or p60:FindFirstChild("Head") or p60:FindFirstChildWhichIsA("BasePart", true)
+				end
+
+				return p60:FindFirstChildWhichIsA("BasePart", true)
+			end
+
+			if GetSetting("espseed") then
+				for _, child in pairs(Map:GetChildren()) do
+					local v154 = v151(child)
+
+					if v154 then
+						if not v154:FindFirstChild("SeedESP") then
+							local BillboardGui = Instance.new("BillboardGui")
+
+							BillboardGui.Name = "SeedESP"
+							BillboardGui.Parent = v154
+							BillboardGui.Adornee = v154
+							BillboardGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+							BillboardGui.Active = true
+							BillboardGui.AlwaysOnTop = true
+							BillboardGui.LightInfluence = 1
+							BillboardGui.Size = UDim2.new(0, 200, 0, 50)
+							BillboardGui.StudsOffset = Vector3.new(0, 2.5, 0)
+
+							local TextLabel = Instance.new("TextLabel")
+
+							TextLabel.Name = "TextLabel"
+							TextLabel.Parent = BillboardGui
+							TextLabel.BackgroundTransparency = 1
+							TextLabel.Size = UDim2.new(1, 0, 1, 0)
+							TextLabel.Font = Enum.Font.GothamBold
+							TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+							TextLabel.TextSize = 14
+							TextLabel.TextStrokeTransparency = 0
+							TextLabel.TextWrapped = true
+						end
+
+						local n2 = 0
+
+						if HumanoidRootPart then
+							n2 = math.floor((HumanoidRootPart.Position - v154.Position).Magnitude)
+						end
+
+						v154.SeedESP.TextLabel.Text = "Seed | " .. n2 .. " M"
+					end
+				end
+			else
+				for _, child in pairs(Map:GetChildren()) do
+					local v160 = v151(child)
+
+					if v160 and v160:FindFirstChild("SeedESP") then
+						v160.SeedESP:Destroy()
+					end
+				end
+			end
+		end)
+	end
+end)
+RunService.RenderStepped:Connect(function()
+	pcall(function()
+		if GetSetting("walkspeed") then
+			LocalPlayer.Character.Humanoid.WalkSpeed = GetSetting("speed_value")
+		else
+			LocalPlayer.Character.Humanoid.WalkSpeed = 16
+		end
+	end)
+end)
+task.spawn(function()
+	while task.wait() do
+		pcall(function()
+			if GetSetting("jumpower") then
+				LocalPlayer.Character.Humanoid.JumpPower = GetSetting("jump_value")
+			end
+		end)
+	end
+end)
+UserInputService.JumpRequest:Connect(function()
+	pcall(function()
+		if GetSetting("infjump") then
+			LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+		end
+	end)
+end)
+task.spawn(function()
+	while task.wait(1) do
+		pcall(function()
+			if workspace:FindFirstChild("LoadingScreenMenu") then
+				VirtualInputManager:SendKeyEvent(true, "E", false, game)
+				VirtualInputManager:SendKeyEvent(false, "E", false, game)
+			end
+		end)
+	end
+end)
+lib:Notify("TDT Hub GAG2", "Script loaded successfully!", 3)
