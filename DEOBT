@@ -1,1 +1,187 @@
+-- ============================================
+-- SCRIPT AUTO TELEPORT LẤY TRỨNG + AUTO E + SAFE ZONE
+-- ============================================
 
+local Workspace        = game:GetService("Workspace")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local VirtualInput     = game:GetService("VirtualInputManager")
+local LocalPlayer      = Players.LocalPlayer
+
+-- Bật = true, Tắt = false
+getgenv().InstantPickup   = true   
+getgenv().AutoPressE      = true   
+getgenv().AutoPressDelay  = 0.05   
+getgenv().AutoPressRadius = 15     
+
+-- ============================================
+-- CẤU HÌNH TỌA ĐỘ
+-- ============================================
+-- Tọa độ an toàn (Safe Zone - Ảnh số 4)
+local SAFE_POS = Vector3.new(198.70, 4.00, 294.73)
+
+-- Danh sách tọa độ trứng (Từ ảnh 1, 2, 3)
+local EggPositions = {
+    Vector3.new(164.25, 4.00, -9690.22), -- Ảnh 1
+    Vector3.new(168.35, 4.00, -9726.47), -- Ảnh 2
+    Vector3.new(180.08, 4.00, -9708.28)  -- Ảnh 3
+}
+
+-- ============================================
+-- PHẦN 1: HỆ THỐNG AUTO E & INSTANT PICKUP (TỪ BẠN)
+-- ============================================
+local function makeInstant(prompt)
+    if not getgenv().InstantPickup then return end
+    if prompt:IsA("ProximityPrompt") then
+        pcall(function()
+            prompt.HoldDuration         = 0
+            prompt.RequiresLineOfSight  = false
+        end)
+    end
+end
+
+local function scanAll()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        makeInstant(obj)
+    end
+end
+
+scanAll()
+
+Workspace.DescendantAdded:Connect(function(obj)
+    makeInstant(obj)
+    if obj:IsA("ProximityPrompt") then
+        obj:GetPropertyChangedSignal("HoldDuration"):Connect(function()
+            if getgenv().InstantPickup and obj.HoldDuration ~= 0 then
+                obj.HoldDuration = 0
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().InstantPickup then pcall(scanAll) end
+    end
+end)
+
+-- Hàm nhấn E và kích hoạt Prompt
+local function pressE()
+    pcall(function()
+        VirtualInput:SendKeyEvent(true,  Enum.KeyCode.E, false, game)
+        task.wait(0.02)
+        VirtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
+end
+
+local function firePrompt(prompt)
+    pcall(function()
+        if fireproximityprompt then
+            fireproximityprompt(prompt)
+        elseif prompt and prompt.Triggered then
+            prompt:InputHoldBegin()
+        end
+    end)
+end
+
+-- Vòng lặp Auto E
+task.spawn(function()
+    while task.wait(getgenv().AutoPressDelay) do
+        if not getgenv().AutoPressE then continue end
+
+        local char = LocalPlayer.Character
+        if not char then continue end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+
+        for _, prompt in ipairs(Workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") then
+                pcall(function()
+                    local parent = prompt.Parent
+                    if parent and parent:IsA("BasePart") then
+                        local dist = (parent.Position - root.Position).Magnitude
+                        if dist <= getgenv().AutoPressRadius then
+                            pressE()
+                            firePrompt(prompt)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- PHẦN 2: LOGIC TELEPORT VÀ CHECK CẦM TRỨNG
+-- ============================================
+
+local function TeleportTo(pos)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Dịch chuyển nhân vật
+    hrp.CFrame = CFrame.new(pos)
+    task.wait(0.1) -- Đợi 1 chút để server cập nhật vị trí
+end
+
+local function HasEggInHand()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    -- Kiểm tra xem có Tool nào đang cầm trên tay không
+    -- (Thường trứng khi nhặt sẽ biến thành Tool hoặc được gắn vào nhân vật)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        return true
+    end
+    
+    -- Một số game không dùng Tool mà gắn Object vào tay (RightHand/LeftHand)
+    -- Bạn có thể mở rộng check ở đây nếu game cụ thể dùng cách khác
+    return false
+end
+
+-- Vòng lặp chính: Di chuyển đến trứng -> Nhặt -> Check -> Về Safe Zone
+task.spawn(function()
+    while task.wait(1) do
+        if not getgenv().AutoPressE then continue end
+        
+        -- BƯỚC 1: Kiểm tra xem đang cầm trứng không?
+        if HasEggInHand() then
+            print("[Hệ Thống] Đang cầm trứng! Di chuyển về Safe Zone...")
+            TeleportTo(SAFE_POS)
+            task.wait(2) -- Đợi 2 giây ở Safe Zone trước khi đi tiếp
+        else
+            -- BƯỚC 2: Nếu không cầm trứng, tự động di chuyển đến các tọa độ trứng
+            for i, pos in ipairs(EggPositions) do
+                print("[Hệ Thống] Đang di chuyển đến trứng số " .. i)
+                TeleportTo(pos)
+                
+                -- Đứng tại chỗ 1.5 giây để hệ thống Auto E (Phần 1) hoạt động và nhặt trứng
+                task.wait(1.5) 
+                
+                -- Nếu nhặt được trứng rồi thì dừng vòng lặp này, quay lại check từ đầu
+                if HasEggInHand() then
+                    break 
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- PHẦN 3: BẬT/TẮT BẰNG PHÍM RightControl
+-- ============================================
+local UserInput = game:GetService("UserInputService")
+UserInput.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        getgenv().AutoPressE = not getgenv().AutoPressE
+        print("[AutoPressE + Teleport] " .. (getgenv().AutoPressE and "BẬT" or "TẮT"))
+    end
+end)
+
+print("[Hệ Thống] Script đã chạy! Auto Teleport + Auto E đã bật.")
+print("Bấm RightCtrl để bật/tắt toàn bộ.")
