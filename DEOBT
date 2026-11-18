@@ -1,5 +1,5 @@
 -- ============================================
--- SCRIPT AUTO TELEPORT LẤY TRỨNG + AUTO E + SAFE ZONE
+-- SCRIPT AUTO TELEPORT LẤY TRỨNG + AUTO E + SAFE ZONE (V2)
 -- ============================================
 
 local Workspace        = game:GetService("Workspace")
@@ -17,7 +17,7 @@ getgenv().AutoPressRadius = 15
 -- ============================================
 -- CẤU HÌNH TỌA ĐỘ
 -- ============================================
--- Tọa độ an toàn (Safe Zone - Ảnh số 4)
+-- Tọa độ an toàn (Safe Zone / Chuồng - Ảnh số 4)
 local SAFE_POS = Vector3.new(198.70, 4.00, 294.73)
 
 -- Danh sách tọa độ trứng (Từ ảnh 1, 2, 3)
@@ -27,8 +27,11 @@ local EggPositions = {
     Vector3.new(180.08, 4.00, -9708.28)  -- Ảnh 3
 }
 
+-- Cấu hình thời gian chờ (Nếu game lag, hãy tăng số này lên)
+local WAIT_AT_EGG_TIME = 2.0 -- Đứng ở chỗ trứng 2 giây để nhặt
+
 -- ============================================
--- PHẦN 1: HỆ THỐNG AUTO E & INSTANT PICKUP (TỪ BẠN)
+-- PHẦN 1: HỆ THỐNG AUTO E & INSTANT PICKUP (GIỮ NGUYÊN)
 -- ============================================
 local function makeInstant(prompt)
     if not getgenv().InstantPickup then return end
@@ -65,7 +68,6 @@ task.spawn(function()
     end
 end)
 
--- Hàm nhấn E và kích hoạt Prompt
 local function pressE()
     pcall(function()
         VirtualInput:SendKeyEvent(true,  Enum.KeyCode.E, false, game)
@@ -84,14 +86,11 @@ local function firePrompt(prompt)
     end)
 end
 
--- Vòng lặp Auto E
 task.spawn(function()
     while task.wait(getgenv().AutoPressDelay) do
         if not getgenv().AutoPressE then continue end
-
         local char = LocalPlayer.Character
         if not char then continue end
-
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then continue end
 
@@ -113,60 +112,79 @@ task.spawn(function()
 end)
 
 -- ============================================
--- PHẦN 2: LOGIC TELEPORT VÀ CHECK CẦM TRỨNG
+-- PHẦN 2: LOGIC TELEPORT & CHECK TÚI ĐỒ (BACKPACK)
 -- ============================================
 
+-- Hàm dịch chuyển nhân vật
 local function TeleportTo(pos)
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Dịch chuyển nhân vật
     hrp.CFrame = CFrame.new(pos)
-    task.wait(0.1) -- Đợi 1 chút để server cập nhật vị trí
+    task.wait(0.2) -- Đợi 0.2s để server load vị trí
 end
 
-local function HasEggInHand()
+-- Hàm đếm số lượng vật phẩm (Trứng) trong Backpack
+-- Nếu game bạn có tên Tool chứa chữ "Egg" hoặc "Trứng", hãy thêm tên đó vào đây
+local function GetEggCount()
+    local count = 0
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
     local char = LocalPlayer.Character
-    if not char then return false end
     
-    -- Kiểm tra xem có Tool nào đang cầm trên tay không
-    -- (Thường trứng khi nhặt sẽ biến thành Tool hoặc được gắn vào nhân vật)
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        return true
+    -- Quét trong Backpack
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                -- MẸO: Nếu biết chính xác tên trứng, sửa dòng dưới thành: if string.find(item.Name, "TênTrứng") then
+                -- Ở đây mình đếm TẤT CẢ các Tool (vì bạn chỉ đi trộm trứng)
+                count = count + 1 
+            end
+        end
     end
     
-    -- Một số game không dùng Tool mà gắn Object vào tay (RightHand/LeftHand)
-    -- Bạn có thể mở rộng check ở đây nếu game cụ thể dùng cách khác
-    return false
+    -- Quét trong Character (phòng trường hợp đang cầm trên tay)
+    if char then
+        for _, item in ipairs(char:GetChildren()) do
+            if item:IsA("Tool") then
+                count = count + 1
+            end
+        end
+    end
+    
+    return count
 end
 
--- Vòng lặp chính: Di chuyển đến trứng -> Nhặt -> Check -> Về Safe Zone
+-- Vòng lặp chính: Trộm trứng -> Check túi -> Về chuồng
 task.spawn(function()
     while task.wait(1) do
         if not getgenv().AutoPressE then continue end
         
-        -- BƯỚC 1: Kiểm tra xem đang cầm trứng không?
-        if HasEggInHand() then
-            print("[Hệ Thống] Đang cầm trứng! Di chuyển về Safe Zone...")
+        -- Lấy số lượng trứng ban đầu
+        local initialEggCount = GetEggCount()
+        
+        -- Lặp qua từng tọa độ trứng
+        for i, pos in ipairs(EggPositions) do
+            -- Nếu đang giữ nhiều hơn lúc đầu (tức là đã nhặt được) thì dừng vòng lặp này
+            if GetEggCount() > initialEggCount then break end 
+            
+            print("[Hệ Thống] Đang di chuyển đến trứng số " .. i)
+            TeleportTo(pos)
+            
+            -- Đứng tại chỗ để Auto E hoạt động (Tăng thời gian này nếu mạng lag)
+            task.wait(WAIT_AT_EGG_TIME) 
+        end
+        
+        -- BƯỚC KIỂM TRA CUỐI: Nếu túi đồ có nhiều hơn ban đầu => Đã trộm thành công
+        if GetEggCount() > initialEggCount then
+            print("[Hệ Thống] Đã trộm được trứng! Đang quay về chuồng...")
+            
+            -- Dịch chuyển về Safe Zone (Chuồng)
             TeleportTo(SAFE_POS)
-            task.wait(2) -- Đợi 2 giây ở Safe Zone trước khi đi tiếp
-        else
-            -- BƯỚC 2: Nếu không cầm trứng, tự động di chuyển đến các tọa độ trứng
-            for i, pos in ipairs(EggPositions) do
-                print("[Hệ Thống] Đang di chuyển đến trứng số " .. i)
-                TeleportTo(pos)
-                
-                -- Đứng tại chỗ 1.5 giây để hệ thống Auto E (Phần 1) hoạt động và nhặt trứng
-                task.wait(1.5) 
-                
-                -- Nếu nhặt được trứng rồi thì dừng vòng lặp này, quay lại check từ đầu
-                if HasEggInHand() then
-                    break 
-                end
-            end
+            
+            -- Đứng chờ ở chuồng 3 giây để game cập nhật (cất trứng, reset)
+            task.wait(3) 
         end
     end
 end)
@@ -183,5 +201,5 @@ UserInput.InputBegan:Connect(function(input, processed)
     end
 end)
 
-print("[Hệ Thống] Script đã chạy! Auto Teleport + Auto E đã bật.")
+print("[Hệ Thống] Script V2 đã chạy! Sẽ tự động về chuồng khi nhặt được trứng.")
 print("Bấm RightCtrl để bật/tắt toàn bộ.")
