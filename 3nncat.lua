@@ -746,7 +746,7 @@ T.LangList = { "Vietnamese", "Japanese", "Thai", "Chinese", "French", "Spanish" 
 	return T
 end)()
 local A =
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/quanghuy221/scriptbyhuy/refs/heads/main/qhdepzaiui.lua"))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/daykits/luoiqua/refs/heads/main/zzzz.lua"))()
 Main = guardUI(A.CreateMain({ Title = "Blox Fruit", Desc = " -  Blox Fruits " }), "Main")
 PageShop = Main.CreatePage({ Page_Name = "Shop", Page_Title = "Shop" })
 getgenv().Options = A.Options
